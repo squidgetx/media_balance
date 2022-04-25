@@ -1,0 +1,4 @@
+mediacloud
+python-dateutil
+numpy
+pandas==1.4.2
