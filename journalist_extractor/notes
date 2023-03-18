@@ -1,0 +1,14 @@
+Simple data pipeline to extract data about journalists from an input set of articles
+
+First, run journalist_extractor.py in the input CSV of articles to get a list of journalists
+
+Then, clean with R to extract unique journalist profiles: (TK bundle this in a script or something):
+
+```
+Rscript -e "library(tidyverse); read_csv('testout') %>% select(name, link) %>% unique() %>% write_csv('test_journalists_unique.csv')"
+
+```
+
+Next, run get_metadata.py to fetch metadata for each journalist (basically, twiter handle and short text description)
+
+From here, we can try to guess their twitter handle (for ppl without twitter in their journalist bio)

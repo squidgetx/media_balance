@@ -20,7 +20,10 @@ def clean_record(record):
     record["authors"] = ",".join(
         [a["firstname"] + " " + a["lastname"] for a in record["byline"]["person"]]
     )
-    record["byline"] = record["byline"]["original"]
+    record["byline_text"] = record["byline"]["original"]
+    if (record['section_name'] == 'Opinion') :
+        import pdb
+        pdb.set_trace()
     return record
 
 
