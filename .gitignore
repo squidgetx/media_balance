@@ -1,5 +1,7 @@
-creds.sh
-nyt-metadata
-.venv
+nyt-metadata/
+sample_data
+tmp
+data
 .DS_Store
-
+.venv
+creds.sh
