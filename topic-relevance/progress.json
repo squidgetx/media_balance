@@ -1,0 +1,12 @@
+{"filename": "data/testing/USAToday_Climate_2022-04-07_The.txt", "label": true, "cost": 0.0003215}
+{"filename": "data/testing/WashTimes_Climate_2021-07-09_Kerry.txt", "label": true, "cost": 0.0004985}
+{"filename": "data/testing/nytimes_Climate_2021-09-21_China.txt", "label": true, "cost": 0.0004685}
+{"filename": "data/testing/WSJ_Climate_2021-12-27_Wildfires.txt", "label": true, "cost": 0.000485}
+{"filename": "data/testing/USAToday_Climate_2022-04-07_The.txt", "label": true, "cost": 0.0003235}
+{"filename": "data/testing/WashTimes_Climate_2021-07-09_Kerry.txt", "label": true, "cost": 0.0004985}
+{"filename": "data/testing/nytimes_Climate_2021-09-21_China.txt", "label": true, "cost": 0.0004685}
+{"filename": "data/testing/WSJ_Climate_2021-12-27_Wildfires.txt", "label": true, "cost": 0.000485}
+{"filename": "data/testing/USAToday_Climate_2022-04-07_The.txt", "label": true, "cost": 0.0003215}
+{"filename": "data/testing/WashTimes_Climate_2021-07-09_Kerry.txt", "label": true, "cost": 0.0004985}
+{"filename": "data/testing/nytimes_Climate_2021-09-21_China.txt", "label": true, "cost": 0.0004705}
+{"filename": "data/testing/WSJ_Climate_2021-12-27_Wildfires.txt", "label": true, "cost": 0.000485}
