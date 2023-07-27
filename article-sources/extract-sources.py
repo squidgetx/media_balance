@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 
-from data_wrangler import robust_task
+from squidtools import robust_task
 
 openai.api_key = os.environ["OPENAI_KEY"]
 
@@ -202,8 +202,7 @@ def make_paragraphs(f):
 
 def extract_sources_file(filename):
     with open(filename, "rt") as f:
-        #lines = make_paragraphs(f)
-        lines = [l.strip() for l in f]
+        lines = make_paragraphs(f)
         sources, cost = extract_sources(lines)
         results = {"filename": filename, "sources": sources, "cost": cost}
         return results

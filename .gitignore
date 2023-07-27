@@ -5,3 +5,6 @@ data
 .DS_Store
 .venv
 creds.sh
+*.tsv
+*.json
+*.Rda

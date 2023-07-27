@@ -1,7 +1,7 @@
 import os
 import argparse
 import json
-from data_wrangler import gpt_utils, robust_task
+from squidtools import gpt_utils, robust_task
 
 IDENTIFY_PROMPT = """
 Does the following news article excerpt contain discussion of
@@ -29,7 +29,7 @@ def make_paragraphs(f):
 def label_file(filename):
     with open(filename, "rt") as f:
         lines = make_paragraphs(f)
-        label, cost = label_lines(lines[0:5])
+        label, cost = label_lines(lines[0:10])
         results = {"filename": filename, "label": label, "cost": cost}
         return results
 
