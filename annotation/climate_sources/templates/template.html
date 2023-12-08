@@ -185,6 +185,7 @@ ul.likert{
       org: pieces[2],
       doc: pieces[3],
       category: pieces[4],
+      comment: pieces[5],
     }
     if (source.person_name != 'N/A') {
       source.display = source.person_name
@@ -221,6 +222,10 @@ ul.likert{
     for(let j = 0; j < 4; j++) {
       fields[j].value = pieces[j]
     }
+    let ul = existing_source_forms[i].querySelector('fieldset')
+    comment = document.createElement('p')
+    comment.innerHTML = `Description: ${source.comment}`
+    legend.insertAdjacentElement('afterend', comment)
 
     fields[4].readOnly = true
     fields[4].style.display = 'none'

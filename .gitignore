@@ -8,3 +8,4 @@ creds.sh
 *.tsv
 *.json
 *.Rda
+annotation_output

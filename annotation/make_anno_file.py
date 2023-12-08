@@ -20,7 +20,7 @@ def process_sources(sources):
         org = source.get('organization')
         doc = source.get('document')
         category = source['category']
-        html += f"<p>{name}|{title}|{org}|{doc}|{category}</p>"
+        html += f"<p>{name}|{title}|{org}|{doc}|{category}|{source.get('comments')}</p>"
     html += "</div>"
     return html
 
