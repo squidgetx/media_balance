@@ -163,10 +163,10 @@ ul.likert{
   for (let i = 0; i < new_source_forms.length; i++) {
     let f = new_source_forms[i]
     let fields = f.querySelectorAll('input')
-    let categorySelector = createCategorySelector(fields[3], '')
-    fields[3].readOnly = true
-    fields[3].display='none'
-    fields[3].parentNode.insertBefore(categorySelector, fields[3])
+    let categorySelector = createCategorySelector(fields[4], '')
+    fields[4].readOnly = true
+    fields[4].style.display='none'
+    fields[4].parentNode.insertBefore(categorySelector, fields[4])
     let nlabels = new_source_forms[i].querySelectorAll('label')
     nlabels.forEach(l => l.classList.add('eLabel'))
     if (i < new_source_forms.length - 1) {
@@ -227,8 +227,10 @@ ul.likert{
     }
     let ul = existing_source_forms[i].querySelector('fieldset')
     comment = document.createElement('p')
-    comment.innerHTML = `Description: ${source.comment}`
-    legend.insertAdjacentElement('afterend', comment)
+    if (source.comment) {
+      comment.innerHTML = `Description: ${source.comment}`
+      legend.insertAdjacentElement('afterend', comment)
+    }
 
     fields[4].readOnly = true
     fields[4].style.display = 'none'

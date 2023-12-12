@@ -23,8 +23,7 @@
     "annotation_codebook_url": "https://docs.google.com/document/d/13lI1fz4Bi9xgK8_mZLBFRSSkFjLP0OHjz7DtHTATPzw/edit?usp=sharing",
 
     "data_files": [
-       #"data_files/aa_opeds_sample_20.json"
-       "data_files/out.json"
+       "data_files/out100.json"
     ],
 
     "item_properties": {
@@ -294,7 +293,7 @@
             "name": "existing_source_15",
             "description": "",
             "labels": [
-                 "Person Name",
+                "Person Name",
                 "Person Title",
                 "Organization",
                 "Document",
@@ -312,7 +311,6 @@
                 "Organization",
                 "Document",
                 "Category",
-                ""
             ],
         },
         {
@@ -325,7 +323,6 @@
                 "Organization",
                 "Document",
                 "Category",
-                ""
             ],
         },
     ],
