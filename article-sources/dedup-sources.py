@@ -32,7 +32,8 @@ if __name__ == '__main__':
                 for s in sources:
                     key = make_key(s)
                     if key in deduped:
-                        deduped[key]['comments'] += s['comments']
+                        if s['comments'] not in deduped[key]['comments']:
+                            deduped[key]['comments'] += ' ' + s['comments']
                         print(key)
                     else:
                         deduped[key] = s

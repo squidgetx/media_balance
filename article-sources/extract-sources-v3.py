@@ -117,7 +117,7 @@ def make_paragraphs(f):
     # Clean lines here
 
     def detect(line):
-        BLACKLIST = ['CREDIT', 'PHOTOGRAPH', 'wsj', 'latimes', 'Source URL', 'Credit:', 'contributed reporting', 'USA TODAY', 'More:', 'Read This:', "NYT", "Continue reading", "Caption", 'nytimes', "WATCH"]
+        BLACKLIST = ['CREDIT', 'PHOTOGRAPH', 'wsj', 'latimes', 'Source URL', 'Credit:', 'contributed reporting', 'USA TODAY', 'More:', 'Read This:', "chicagotribune", "NYT", "Continue reading", "Caption", 'nytimes', "WATCH"]
         for kw in BLACKLIST:
             if kw in line:
                 return True
