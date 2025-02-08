@@ -1,0 +1,22 @@
+Code and data to get journalist metadata and information given names and newspapers
+
+Uses the proxycurl API in order to scrape LinkedIn profiles
+
+1. get_muckrack.py uses duckduckgo/qwant search engine to try to find the MuckRack
+page of the journalist. Most journalists (~60%) have a Muckrack page that also contains a linkedIn page. (TODO - update this to also scrape job titles and employers from Muckrack). We use a rough heuristic to match profiles based on name similarity and confirm that the Muckrack profile mentions the newspaper in question. 
+
+2. get_linkedin.py takes the muckrack JSON and the original authors list and tries to 
+find the linkedin profiles. If we got a muckrack profile from step 1, we scrape that LinkedIn profile directly using Proxycurl. If there is a missing Muckrack profile, we use DDG/Qwant to try to search for the relevant LI profile in an automated way.
+
+    a. Originally, I ran Steps 1 and 2 with some mistakes so I had to re-run the pipeline for a select group of author names. These results are in `data/authorsXXX.json`
+
+3. clean_linkedin.py takes all the scraped JSON and formats it into a table and also handles the redo merging shenanigans.
+
+4. Finally, authors.R does some basic analysis and more cleaning, spits out a TSV in `data/author.data.clean.tsv`
+
+The resulting journalist metadata therefore, are either
+1. Scraped from a "confirmed" muckrack profile (name match + newspaper match)
+2. Strong name match on Linkedin that was found via automated search
+3. Manually reviewed 
+
+The match source can be found in the `match_source` column

@@ -1,0 +1,9 @@
+# Organization Name Clustering
+
+This directory contains code related to deduplicating/clustering similar organization names
+The basic strategy is to use GPT to generate information about each organization.
+Then, we use simple hierarchical clustering based on cosine similarity to group similar organizations together.
+
+- python describe-orgs.py retrieves descriptions
+- python cluster-descriptions.py clusters the descriptions together based on a distance threshold. We use 0.25 based on a set of test cases, erring on the conservative side (ie, we leave some similar descriptions unclustered and prioritize never making an erroneous grouping)
+- Rscript check_clusters.R checks the clustering quality and then produces the final output.

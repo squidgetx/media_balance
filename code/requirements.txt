@@ -1,0 +1,3 @@
+squidtools
+tiktoken
+faiss-cpu

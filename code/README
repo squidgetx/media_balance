@@ -1,0 +1,51 @@
+This directory contains all code used to build the data in `data/masterdata`
+
+The input is a list of news articles.
+The output is a set of data files describing:
+- the sources cited in each news article
+- the journalists who wrote each news article
+- aggregate information about sources at the news article level
+
+# 0 - Relevance Labeling
+
+The first step in the process is to figure out which news articles are relevant to climate change.
+
+The initial dataset was selected by searching the ProQuest database to find articles that mention climate change
+However, many of these are not about climate change.
+For example, they might be mostly about a candidates' campaign strategy and note that the candidate mentioned climate change once in a speech.
+
+The file `data/articles/all_articles.metadata.tsv` contains an entry for every row in the dataset
+including the first 250 words of the article in the `excerpts` column.
+
+We use GPT to label whether the article is about climate change or not based on this data. 
+The code to do this is in `articles/label-topic.py`
+
+usage: `python articles/label-topic.py ../data/articles/all_articles.metadata.tsv`
+Output: `code/articles/topic-labels.tsv`
+
+*TODO* We should validate the GPT method.
+
+## Article Cleaning
+
+Next, we merge the topic labels, clean the article data and remove duplicate articles. 
+This code is in `articles/clean.R`
+
+Inputs are: `data/articles/all_articles.metadata.tsv`
+and `code/articles/topic-labels.tsv`
+
+Output is a TSV of articles with the relevancy labels as well as a subset of 
+articles that have been labeled as relevant in
+`data/articles/relevant.articles.clean.tsv`
+
+# 1 - Source Extraction
+
+Next, we extract sources from the article text.
+The datafile `data/articles/relevant.articles.clean.tsv` has the metadata for each article but not the raw text
+The raw text is split between 2 directories: `data/articles/txt` and `data/articles/v2/txt`.
+The dataset was split into 2 batches and processed at different times.
+
+:w
+
+
+
+

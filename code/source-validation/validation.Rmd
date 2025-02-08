@@ -1,0 +1,101 @@
+---
+title: "Climate Sources Data Validation"
+date: 2024-06-13
+---
+
+# Validating general categories
+
+```{r}
+source(here("code/prep_analysis.R"))
+set.seed(1234)
+sources %>%
+    sample_n(200) %>%
+    select(
+        category.exp,
+        person_name,
+        person_title,
+        organization,
+        document,
+        comments,
+    ) %>%
+    write_csv(here("data/category-validation-labels.csv"))
+
+labels <- read_csv(here("data/category-validation-labels.csv"))
+labels$label %>% table()
+175 / 199
+```
+
+# Validating Slant categories
+
+```{r}
+set.seed(1235)
+sources %>%
+    group_by(category.slant) %>%
+    sample_n(20) %>%
+    ungroup() %>%
+    select(
+        category.slant,
+        person_name,
+        person_title,
+        organization,
+        document,
+        comments,
+    ) %>%
+    write_csv(here("data/category-slant-validation-labels.csv"))
+
+labels <- read_csv(here("data/category-slant-validation-labels.csv"))
+labels$label %>% table()
+124 / 140
+```
+
+# Validating topic labels
+
+```{r}
+df <- read_tsv(here("data/climate-excerpts/articles/all_articles.metadata.tsv"))
+df2 <- read_tsv(here("data/climate-excerpts/articles/topic-labels.rnd2.tsv")) %>% mutate(
+    filename = str_remove(filename, '.txt'),
+    filename = str_remove(filename, 'excerpts/'),
+    filename = str_remove(filename, '.txt'),
+)
+head(df2$filename)
+df <- df %>% left_join(df2, by='filename') %>% mutate(
+    relevant = case_when(
+        !is.na(label) ~ label,
+        TRUE ~ relevant
+    )
+)
+table(df$label)
+table(df$relevant)
+library(quanteda)
+kc <- corpus(df$keywords)
+dfm <- tokens(kc, remove_punct = T) %>%
+    tokens_tolower() %>%
+    tokens_compound(phrase(c("climate change", "global warming", "environmental policy"))) %>%
+    dfm()
+termFreqs <- colSums(dfm) %>%
+    as.data.frame() %>%
+    rename(freq = ".") %>%
+    filter(freq > 1) %>%
+    arrange(desc(freq))
+termFreqs %>% head(n = 10)
+good_terms <- list(cc = c(
+    "climate_change",
+    "emissions",
+    "greenhouse",
+    "carbon",
+    "environmental",
+    "environmental_policy",
+    "fossil",
+    "global_warming",
+    "pollution",
+    "ecology",
+    "forest"
+))
+lc <- dfm_lookup(dfm, dictionary(good_terms))
+df$lc <- convert(lc, to = "data.frame")$cc > 0
+library(caret)
+confusionMatrix(reference=df$lc %>% as.factor(), data=df$relevant %>% as.factor(), positive = "TRUE", mode='prec_recall')
+df %>% filter(lc & !relevant) %>% select(title) %>% sample_n(10)
+exc <- read_tsv(here('data/climate_excerpts/articles/all_articles.excerpts.tsv'))
+df %>% filter(!lc & relevant) %>% select(keywords)
+```

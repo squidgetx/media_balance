@@ -1,0 +1,42 @@
+---
+title: "Article Relevancy Validation"
+---
+
+```{r}
+library(caret)
+library(tidyverse)
+library(here)
+library(knitr)
+labeled <- read_tsv(here('code/articles/topic-labels-validation.tsv')) %>% mutate(label = label == 'yes')
+labeled <- read_tsv(here('data/articles/relevancy_validation_sample.tsv.bak'))
+confusionMatrix(
+    ref=labeled$human_label %>% as.factor(), 
+    data=labeled$label %>% as.factor(), 
+    positive = "TRUE",
+    mode='prec_recall'
+)
+```
+
+```{r}
+# Which ones failed?
+sum(labeled$cost)
+labeled %>% filter(human_label == T & label == F) %>% select(!c(filename)) %>% kable()
+labeled %>% filter(human_label == F & label == T) %>% select(!c(filename)) %>% kable()
+```
+
+Very good accuracy performance. Most mistakes are recall errors - GPT labels things
+as not relevant (so they aren't included). We could attempt to fix this, or just argue
+that this is sufficiently good performance.
+
+```{r}
+labeled <- read_tsv(here('code/articles/policy-labels-validation.tsv')) %>% mutate(label = label == 'yes')
+#labeled <- read_tsv(here('data/articles/relevancy_validation_sample.tsv'))
+confusionMatrix(
+    ref=labeled$human_label %>% as.factor(), 
+    data=labeled$label %>% as.factor(), 
+    positive = "TRUE",
+    mode='prec_recall'
+)
+labeled %>% filter(human_label == F & label == T) %>% select(!c(filename)) %>% kable()
+labeled %>% filter(human_label == T & label == F) %>% select(!c(filename)) %>% kable()
+```

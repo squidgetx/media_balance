@@ -1,0 +1,62 @@
+# Dime matching for organizations
+
+This directory contains all code related to matching organizations to the DIME dataset. This process was generally super messy, although I tried as best as possible to follow best practices where available.
+
+## Data
+
+The main input data lives in `data/dime_contributor_pac.csv`, `data/labels.tsv`, and `orgs_cleaned.tsv`.
+
+The DIME dataset contains over 2M rows of organization names that are super messy, including many abbrevations and typos. Our orgs_cleaned data is better (fewer typos), but there are still several different possible ways to identify the same organization. To make things even more complicated, it probably makes sense to match organizations that are strictly different but probably a good proxy for ideology - for instance, we can assume different local branches of the same union have similar ideologies.
+
+In general, the basic strategy is to first generate a large pool of plausible matches between the two datasets and then use increasingly sophisticated algorithms and techniques to whittle this pool down. 
+
+## Generating Candidate Matches
+
+There are 20K organizations and 2M rows of organization names, so 40B possible matches. The vast majority of these we will throw away. Ideally we can come up with a relatively fast way to identify plausible matches. Most out of the box R fuzzy matching software relies on fuzzy string matching and basic brute force techniques (ie, compare every single pair).
+
+I experimented with a few different techniques, and so far the best thing I found was using the python package `rapidfuzz`.
+This package is able to generate the top 100 closest strings from the DIME dataset by Jaro-Winkler string distance in about 0.3 seconds on my M1 machine. This means that it will take about 2 hours to generate 20K * 100 = 2M match candidates. Other methods using R seemed to naively load the entire cross join table into memory, which is totally infeasible on my machine, and the other Python methods were significantly slower than using the rapidfuzz package. The crucial assumption we have to make is that the top 100 closest strings will contain the best match, even in cases where the Jaro-Winkler distance is not the most useful. In testing a handful of manual cases, this seemed like a reasonable assumption, although it may be useful to further investigate this assumption. 
+
+Note to self - we could kind of get at this by identifying the rank of the Jaro-Winkler scores for the ultimate confirmed matches, or by looking at a few other measures or a sub-sample of the entire dataset.
+
+## First Pass - Text Similarity
+
+The easiest first approach is to use basic text similarity measures.
+The fedmatch and stringdist R packages make it easy to calculate the JaroWinkler distance,
+weighted jaccard similarity, and cosine similarity. 
+
+The tricky part is to pick the threshold below which we no longer consider a match worth investigating. Just by looking at a few entries by hand, it was pretty clear that low string similarity scores meant the probability of a match was very unlikely. 
+However, there were enough degenerate cases which meant that choosing a threshold
+more systematically would be well advised. 
+
+I hand-labeled about 800 pairs of strings, sampling somewhat evenly from the 
+spectrum of string similarity scores and over-sampling from the range that seemed 
+close to the best thresholds. Next, I trained a logistic regression model based on the
+three string similarity measures and a 70% train-test split with my hand-labeled data. This model was very simple but did have a decent amount of predictive power (AUC 0.8). 
+
+I used the test set data to identify the thresholds that marked 95% precision and recall. My logic is that I can rely on pairs that score above the 95% precision threshold to reliably be true matches and pairs that score below the 95% recall threshold to reliably be false matches. Using these (quite conservative) thresholds, I eliminated 1.97M candidates right away. However, there were still around 90K pairs left that I could not confidently 
+use the basic text similarity model to differentiate.
+
+## Third pass - GPT
+
+My next thought was that I could possibly use an LLM to differentiate between the remaining "hard" cases. With a little bit of prompt engineering, I came up with a prompt for GPT-4o. I ran this prompt over my 800 hand labeled data cases and found that it performed decently (accuracy 0.92, precision 0.78, recall 0.89, F1 0.83).
+
+However, running GPT-4o over 90K pairs is a little annoying. It would cost a couple hundred dollars, and more importantly, take far too long (several hours) even with batching the API calls together.
+
+## Second pass - BERT
+
+I decided to try to build a fine-tuned SentenceTransformer with the data that I already had that would hopefully perform much better than the text similarity techniques and faster than using a full LLM. I fed the base SentenceTransformer model ('all-MiniLM-L6-v2') with all 7000 positive cases from the text similarity scoring, a random 10000 negative cases, and the results of 10000 in-between cases that were then scored using GPT-4o. 
+
+The performance of this model was fairly impressive. I couldn't convincingly use it to replace GPT-4o, but overall the performance on the 800 hand labeled cases was quite good (AUC 0.92, F1=0.73). Using a similar technique to the logistic regression with text similarity measures, I identified the thresholds of similarity again with 95% cutoffs for precision and recall. The model was able to kick almost 70K of the cases to the curb leaving around 20K left. This was a reasonable amount to send to GPT-4o, which finished categorizing these remaining cases in a couple hours. 
+
+## Validation
+
+As a final validation exercise, I randomly sampled 60 match pairs, 10 each from each condition- that is, whether the pair was a predicted match or not as well as which pass the pair was from. All 60 pairs passed my manual inspection - there were no errors!
+
+Digging into a few more cases, I noticed a couple errors here and there. typically these were cases where the two organizations were closely related but associated with different geographical areas. Overall I would estimate the error rate to be less than 1%
+
+## Future Steps
+
+A lot of work went into this not only to produce high quality matches, but to try to produce some infrastructure and learning that could be used to improve simlar processes in the future. This is actually the second time around doing DIME matching - the first time I waited 30-40 hours to generate the initial sets of pairs. However, I needed to re-do the process as we collected more data throughout the project. 
+
+I think a big contribution here is the BERT transformer. It took a fair amount of effort to collect the training data, but now it can be used to estimate the similarity of organization names with a surprising degree of accuracy. Importantly, it might be useful not only in the process of eliminating matches, but also generating matches in the first places. I want to try to use FAISS and HSNW to see if the dense vector representation created by this sentence transformer allows use to treat the problem as a vector clustering similarity problem instead of having to brute force generate all the candidates before winnowing them down. 

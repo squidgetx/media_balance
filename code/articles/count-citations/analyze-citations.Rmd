@@ -1,0 +1,56 @@
+---
+title: "Citations make up a substantive portion of news articles"
+---
+
+```{r}
+library(here)
+library(tidyverse)
+
+cc <- read_tsv(here('code/articles/count-citations/citation-counts.tsv')) %>% mutate(
+    prop_cite_words = n_cite_words / all_words,
+    prop_cite_lines = n_cite_lines / n_lines,
+    prop_cite_lines_words = n_words_cite_lines / all_words,
+)
+cc$prop_cite_words %>% hist
+cc$prop_cite_lines %>% hist
+cc$prop_cite_lines_words %>% hist
+summary(cc$prop_cite_words)
+summary(cc$prop_cite_lines)
+summary(cc$prop_cite_lines_words)
+table(cc$prop_cite_words == 0)
+```
+
+The average news article in our sample is 13% composed of directly quoted words.
+
+An average of 37% of sentences contain direct quotes or keywords such as "said", "according", or "reported."
+
+```{r}
+articles <- read_tsv(here('data/articles/relevant.metadata.clean.tsv'))
+by_source <- cc %>% left_join(articles) %>% group_by(source) %>% summarize(
+    prop_cite_lines=mean(prop_cite_lines),
+    prop_cite_words=mean(prop_cite_words)
+)
+by_source
+```
+
+Some variation by outlet but not too  much - Chicago tribune quotes almost half as much as USA today.
+
+## No big changes over time
+```{r}
+cc %>% left_join(articles) %>% ggplot(
+    aes(x=date, y=prop_cite_lines)
+) + geom_point() + geom_smooth()
+
+cc %>% left_join(articles) %>% ggplot(
+    aes(x=date, y=prop_cite_words)
+) + geom_point() + geom_smooth()
+
+cc %>% left_join(articles) %>% ggplot(
+    aes(x=date, y=prop_cite_lines, color=source)
+) + geom_point(alpha=0.1) + geom_smooth()
+
+cc %>% left_join(articles) %>% ggplot(
+    aes(x=date, y=prop_cite_words, color=source)
+) + geom_point(alpha=0.1) + geom_smooth()
+
+```

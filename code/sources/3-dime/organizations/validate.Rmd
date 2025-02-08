@@ -1,0 +1,47 @@
+---
+toc: true
+---
+
+```{r include=F}
+library(here)
+library(tidyverse)
+library(caret)
+library(knitr)
+```
+
+## gpt 4 performance on the validation set
+
+```{r}
+labels.stg2 <- read_tsv(
+    here('code/sources/3-dime/organizations/labels.gpt.stg2.tsv'),
+    show_col_types = F
+) %>% filter(label %in% c('F', 'T')) %>% mutate(
+    relation.f = case_when(
+        tolower(likely_match) == 'false' ~ F,
+        TRUE ~ relation == 'match',
+    ) %>% as.factor(),
+    label = as.factor(label == 'T')
+)
+
+confusionMatrix(
+    data=labels.stg2$relation.f,
+    reference=labels.stg2$label,
+    positive='TRUE',
+    mode='prec_recall'
+)
+```
+
+## match coverage
+
+```{r}
+df <- read_tsv(here('code/sources/3-dime/organizations/sources.dime.orgs.tsv'), show_col_types = F)
+df$cfscore %>% is.na %>% table %>% kable
+df$cfscore %>% is.na %>% table %>% prop.table %>% kable
+```
+
+## top matches
+
+```{r}
+df %>% group_by(entity_id, entity_name, cfscore, cfscoresd) %>% summarize(n=n()) %>% arrange(desc(n))  %>% 
+    head(30) %>% kable
+```

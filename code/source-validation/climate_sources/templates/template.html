@@ -1,0 +1,269 @@
+<style>
+.f-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.f-column {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 100%;
+  flex: 1;
+}
+ 
+li {
+  float:none !important;
+  display: flex;
+  align-items: baseline;
+}
+
+.eLabel {
+  font-weight: bold;
+  padding: 0.2em;
+  width: 170px;
+}
+
+ul.likert{
+  text-align: left !important;
+}
+
+.btn-tertiary {
+  text-decoration: underline;
+  background-color: #160085;
+  color: white;
+  margin-left: 1em;
+  padding: 0.1em;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.btn-clicked {
+  background-color: forestgreen;
+}
+
+#source_options {
+  display: none
+}
+
+</style>
+
+
+
+<div >
+  <div class="f-row">
+    <div name="text" class="instance column">
+      <div name="instance_text"  >
+        <div class="itext">
+          {{instance | safe}}
+        </div>
+      </div>
+    </div>
+    <div class="annotation_schema column" style="display: block";>
+        {{annotation_schematic}}
+    </div>
+  
+  </div>
+</div>
+ 
+<script>
+  // Require sources to be embedded in a div with id source_options
+  // with p tags separated by semicolons?
+  const NEW_SOURCES = 2
+  const EXISTING_SOURCES = 15
+
+  let items = document.getElementById('source_options')
+  let forms = document.querySelectorAll('.annotation_schema > form')
+  let source_form = forms[0]
+  let all_forms = Array.from(forms).slice(1)
+  let existing_source_forms = Array.from(forms).slice(1, 1 + EXISTING_SOURCES)
+  let new_source_forms = Array.from(forms).slice(1 + EXISTING_SOURCES, 1 + NEW_SOURCES + EXISTING_SOURCES)
+  // add legend details to category
+
+  let createNewSourceButton = (node, txt) => {
+    const addNewSourceButton = document.createElement('div')
+    addNewSourceButton.classList.add('btn')
+    addNewSourceButton.classList.add('btn-secondary')
+    addNewSourceButton.innerHTML = txt,
+    addNewSourceButton.addEventListener('click', (e) => {
+      node.style.display = 'block'
+    })
+    return addNewSourceButton
+  }
+
+  let createCategorySelector = (textfield, defaultValue) => {
+    let categorySelector = document.createElement('select')
+    categorySelector.innerHTML = `
+      <option value="politician">politician</option>
+      <option value="bureaucrat">bureaucrat/government official</option>
+      <option value="judge">judge/judicial</option>
+      <option value="international organization">international organization</option>
+      <option value="military">military</option>
+      <option value="lobbyist/interest group">lobbyist/interest group</option>
+      <option value="nonprofit/activist">nonprofit/activist</option>
+      <option value="academic">academic</option>
+      <option value="nonacademic expert/research">nonacademic expert/research</option>
+      <option value="industry/corporation">industry/corporation</option>
+      <option value="healthcare/medical">healthcare/medical</option>
+      <option value="media/author">media/author</option>
+      <option value="citizen">citizen</option>
+      <option value="other">Other</option>
+    `
+    categorySelector.value = defaultValue
+    categorySelector.addEventListener('input', () => {
+      if (categorySelector.value == 'other') {
+        textfield.readOnly = false
+        textfield.style.display = 'inline-block'
+        textfield.value = ''
+      } else {
+        textfield.readOnly = true
+        textfield.style.display = 'none'
+        textfield.value = categorySelector.value
+      }
+    })
+    return categorySelector
+  }
+
+  let createCitationRadio = (textfield) => {
+    textfield.style.display = 'none'
+    let citationRadio = document.createElement('div')
+    citationRadio.innerHTML = `
+    <fieldset>
+      <legend>Is this primary source cited in the text?</legend>
+
+      <div>
+        <input type="radio" id="yes" name="cite" value="Yes" />
+        <label for="yes">Yes. I have corrected details where necessary.</label>
+      </div>
+      <div>
+        <input type="radio" id="yes-dup" name="cite" value="Yes-Dup" />
+        <label for="yes-dup">Yes, but it's redundant/duplicate of another source.</label>
+      </div>
+      <div>
+        <input type="radio" id="no" name="cite" value="no" />
+        <label for="no">No</label>
+      </div>
+
+      <div>
+        <input type="radio" id="unsure" name="cite" value="unsure" />
+        <label for="unsure">Unsure</label>
+      </div>
+
+
+    </fieldset>`
+    citationRadio.addEventListener('input', () => {
+        textfield.value = citationRadio.querySelector('input[name="cite"]:checked').value
+    })
+    return citationRadio
+  }
+
+  source_form[0].appendChild(createNewSourceButton(new_source_forms[0], "Add New Sources"))
+
+  for (let i = 0; i < new_source_forms.length; i++) {
+    let f = new_source_forms[i]
+    let fields = f.querySelectorAll('input')
+    let categorySelector = createCategorySelector(fields[4], '')
+    fields[4].readOnly = true
+    fields[4].style.display='none'
+    fields[4].parentNode.insertBefore(categorySelector, fields[4])
+    let nlabels = new_source_forms[i].querySelectorAll('label')
+    nlabels.forEach(l => l.classList.add('eLabel'))
+    if (i < new_source_forms.length - 1) {
+      f.appendChild(createNewSourceButton(new_source_forms[i + 1], "Add Another"))
+    }
+  }
+
+  let option_table = source_form.querySelector('fieldset > table > tbody')
+  let source_form_inputs = source_form.querySelectorAll('input')
+
+  for (let i = 0; i < items.childNodes.length; i ++) {
+    // Dynamically add the sources to the list text :)
+    let node = items.childNodes[i]
+    let option_row = option_table.childNodes[i]
+    let pieces = node.innerHTML.split('|')
+    let source = {
+      person_name: pieces[0],
+      person_title: pieces[1],
+      org: pieces[2],
+      doc: pieces[3],
+      category: pieces[4],
+      comment: pieces[5],
+    }
+    if (source.person_name != 'N/A') {
+      source.display = source.person_name
+      if (source.org != 'N/A') {
+        source.display += ` (${source.org})`
+      }
+    } else if (source.doc != 'N/A') {
+      source.display = source.doc
+      if (source.org != 'N/A') {
+        source.display += ` (${source.org})`
+      }
+    } else {
+      source.display = source.org
+    }
+    option_row.childNodes[0].childNodes[0].innerHTML += '. ' + source.display
+    let showCorrectionButton = document.createElement('div')
+    showCorrectionButton.innerHTML = 'Edit Details'
+    showCorrectionButton.classList.add('btn')
+    showCorrectionButton.classList.add('editDetails')
+    showCorrectionButton.classList.add('btn-tertiary')
+    showCorrectionButton.addEventListener('click', () => {
+      existing_source_forms.forEach(f => f.style.display = 'none')
+      existing_source_forms[i].style.display = 'block'
+      source_form.querySelectorAll('.editDetails').forEach(s => s.classList.remove('btn-clicked'))
+      showCorrectionButton.classList.add('btn-clicked')
+    })
+    option_row.appendChild(showCorrectionButton)
+    let fields = existing_source_forms[i].querySelectorAll('input')
+    let labels = existing_source_forms[i].querySelectorAll('label')
+    labels.forEach(l => l.classList.add('eLabel'))
+
+    let legend = existing_source_forms[i].querySelector('legend')
+    legend.innerHTML += source.display
+    for(let j = 0; j < 4; j++) {
+      fields[j].value = pieces[j]
+    }
+    let ul = existing_source_forms[i].querySelector('fieldset')
+    comment = document.createElement('p')
+    if (source.comment) {
+      comment.innerHTML = `Description: ${source.comment}`
+      legend.insertAdjacentElement('afterend', comment)
+    }
+
+    fields[4].readOnly = true
+    fields[4].style.display = 'none'
+    fields[5].readOnly = true
+
+    let categorySelector = createCategorySelector(fields[4], (pieces[4] || '').toLowerCase())
+    fields[4].parentNode.insertBefore(categorySelector, fields[4])
+    fields[4].value = categorySelector.value
+
+    let citationRadio = createCitationRadio(fields[5])
+    fields[5].parentNode.insertBefore(citationRadio, fields[5])
+    citationRadio.addEventListener('input', () => {
+      let value = citationRadio.querySelector('input[name="cite"]:checked').value
+      // Hide and show the correction fields as necessary
+      if (value == 'yes-correction') {
+        //Array.from(fields).slice(0,4).forEach(s => s.style.display='block')
+      } else {
+        //Array.from(fields).slice(0,4).forEach(s => s.style.display='none')
+      }
+      // Make a checkmark for the corresponding source form
+      source_form.querySelectorAll('input')[i].checked = true
+    })
+
+    existing_source_forms[i].querySelectorAll('br').forEach(f => f.remove())
+   
+
+  }
+
+  all_forms.forEach(f => f.style.display = 'none')
+
+  // Hide rows that are no longer relevant
+  for (let i = items.childNodes.length; i < option_table.childNodes.length; i++) {
+  option_table.childNodes[i].style.display = 'none'
+  }
+
+</script>

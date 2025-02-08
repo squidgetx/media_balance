@@ -1,0 +1,352 @@
+{
+    "port": 9001,
+
+    "server_name": "potato annotator",
+
+    "annotation_task_name": "Climate Article Sources",
+
+    # Potato will write the annotation file for all annotations to this
+    # directory, as well as per-annotator output files and state information
+    # necessary to restart annotation.
+    "output_annotation_dir": "annotation_output/",
+
+    # The output format for the all-annotator data. Allowed formats are:
+    # * jsonl
+    # * json (same output as jsonl)
+    # * csv
+    # * tsv
+    #
+    "output_annotation_format": "tsv", 
+
+    # If annotators are using a codebook, this will be linked at the top to the
+    # instance for easy access
+    "annotation_codebook_url": "https://docs.google.com/document/d/13lI1fz4Bi9xgK8_mZLBFRSSkFjLP0OHjz7DtHTATPzw/edit?usp=sharing",
+
+    "data_files": [
+       "data_files/out250.json"
+    ],
+
+    "item_properties": {
+        "id_key": "id",
+        "text_key": "text",
+        "context_key": "context",
+    },
+
+    #the jumping-to-id function will be disabled if "jumping_to_id_disabled" is True
+    "jumping_to_id_disabled": False,
+
+    #the navigation bar will be hidden to the annotators if "hide_navbar" is True
+    #"hide_navbar": True,
+
+    "user_config": {
+
+      "allow_all_users": True,
+      
+      "users": [  ],
+    },
+
+    "login": {
+        "type": 'url_direct', #can be 'password' or 'url_direct'
+        "url_argument": 'PROLIFIC_PID' # when the login type is set to 'url_direct', 'url_argument' must be setup for a direct url argument login
+    },
+
+    "automatic_assignment": {
+        "on": True, #whether do automatic task assignment for annotators, default False.
+        "output_filename": 'task_assignment.json', #no need to change
+        "sampling_strategy": 'random', #currently we support random assignment or ordered assignment. Use 'random' for random assignment and 'ordered' for ordered assignment
+        "labels_per_instance": 1,  #the number of labels for each instance
+        "instance_per_annotator": 4, #the total amount of instances to be assigned to each annotator
+        "test_question_per_annotator": 1, # the number of attention test question to be inserted into the annotation queue. you must set up the test question in surveyflow to use this function
+    },
+
+    # How many seconds do you want the annotators spend on each instance, after
+    # that, an alert will be sent per alert_time_each_instance seconds.
+    "alert_time_each_instance": 10000000,
+
+    "surveyflow": {
+        "on": true,
+        "order": [
+            "pre_annotation",
+            "post_annotation"
+        ],
+        "pre_annotation": [
+        ],
+        "post_annotation": [
+            "surveyflow/end.jsonl",
+        ],
+        "testing": [
+            "surveyflow/testing.jsonl"
+        ]
+    },
+
+
+    "annotation_schemes": [      
+        {
+            "annotation_type": "multiselect",
+            "name": "primary_source",
+            "description": "Edit details for each of the following primary sources.<br />Add details for any primary sources cited in the text that are not included in this list",
+            "required": true,
+            "labels": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15"
+            ],
+        },       
+       
+        {
+            "annotation_type": "text",
+            "name": "existing_source_1",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_2",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_3",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_4",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_5",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_6",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+
+        {
+            "annotation_type": "text",
+            "name": "existing_source_7",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_8",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_9",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_10",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+       {
+            "annotation_type": "text",
+            "name": "existing_source_11",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_12",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_13",
+            "description": "",
+            "labels": [
+                 "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_14",
+            "description": "",
+            "labels": [
+                 "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "existing_source_15",
+            "description": "",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+                ""
+            ],
+        },
+         {
+            "annotation_type": "text",
+            "name": "new_source_1",
+            "description": "New Source 1",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+            ],
+        },
+        {
+            "annotation_type": "text",
+            "name": "new_source_2",
+            "description": "New Source 2",
+            "labels": [
+                "Person Name",
+                "Person Title",
+                "Organization",
+                "Document",
+                "Category",
+            ],
+        },
+    ],
+
+    # The html that changes the visualiztation for your task. Change this file
+    # to influence the layout and description of your task. This is not a full
+    # HTML page, just the piece that does lays out your task's pieces
+    # you may use templates in our lib, if you want to use your own template,
+    # please replace the string as a path to the template
+    "html_layout": "templates/template.html",
+
+    # The core UI files for Potato. You should not need to change these normally.
+    #
+    # Exceptions to this might include:
+    # 1) You want to add custom CSS/fonts to style your task
+    # 2) Your layout requires additional JS/assets to render
+    # 3) You want to support additional keybinding magic
+    #
+    # if you want to use your own template,
+    # please replace the string as a path to the template
+    "base_html_template": "default",
+    "header_file": "default",
+
+    # This is where the actual HTML files will be generated
+    "site_dir": "default"
+
+}
