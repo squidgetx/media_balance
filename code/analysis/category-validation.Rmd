@@ -4,7 +4,7 @@
 ```{r include=F}
 source(here::here("code/setup.R"))
 # Load sources, articles, journos
-datadir <- "data/masterdata2"
+datadir <- "data/masterdata"
 ```
 
 ```{r}
