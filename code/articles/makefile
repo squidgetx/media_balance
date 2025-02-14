@@ -1,5 +1,6 @@
 default: articles.clean.comments.tsv
 	ln -sf articles.clean.comments.tsv articles.clean.tsv
+	ln -sf articles.clean.comments.tsv ../../data/articles/articles.clean.tsv
 
 articles.clean.comments.tsv: articles.clean.policy.tsv nyt_details/nyt-comments-clean.tsv merge_comments.R 
 	Rscript merge_comments.R articles.clean.policy.tsv articles.clean.comments.tsv

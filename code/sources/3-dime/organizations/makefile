@@ -14,8 +14,12 @@ maybes.bert.stg1.tsv: maybes.ts.stg0.tsv
 maybes.ts.stg0.tsv: match-candidates.tsv orgs_cleaned.tsv
 	Rscript get_matches_ts.R
 
+orgs_cleaned.tsv: prepare_matching.R ../data ../../1-dedup/orgs.clustered.tsv
+	Rscript prepare_matching.R
+
+
 # Depends on 1-dedup/orgs.cleaned.deduped.tsv
 # Takes 1.5 hours
-#match-candidates.tsv: ../../1-dedup/orgs.clustered.tsv prepare_matching.R get-match-candidates.py
+#match-candidates.tsv:  prepare_matching.R get-match-candidates.py
 #	Rscript prepare_matching.R
 #	python get-match-candidates.py  

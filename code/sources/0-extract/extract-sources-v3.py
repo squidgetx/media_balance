@@ -191,15 +191,17 @@ if __name__ == "__main__":
         files = {row['filename']: row['textfile'] for row in reader}
         bad_files = set()
         for id in files:
-            with open(files[id], 'rt') as f:
-                lines = make_paragraphs(f) 
-                if len(lines) == 0:
-                    bad_files.add(id)
+            try:
+                with open(files[id], 'rt') as f:
+                    lines = make_paragraphs(f) 
+                    if len(lines) == 0:
+                        bad_files.add(id)
+            except:
+                pass
 
         if len(bad_files) > 0:
             util.print_err(f"Warning: {len(bad_files)} empty files removed from processing")
             for id in bad_files:
-                util.print_err(f" {id}")
                 del(files[id])
 
         results = robust_task.async_robust_task(

@@ -1,6 +1,6 @@
 source(here::here('code/setup.R'))
 
-dime <- read_csv(here("code/sources/3-dime/data/dime_contributor_pac.csv")) %>%
+dime <- read_csv(here("data/dime/dime_contributor_pac.csv")) %>%
     mutate(contributor_name = str_trim(gsub("[[:punct:] ]+", " ", contributor_name))) %>%
     group_by(contributor_name) %>%
     summarize(

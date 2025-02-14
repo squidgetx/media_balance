@@ -6,5 +6,5 @@ sources.clean.tsv: sources.raw.tsv
 sources.raw.tsv: extracted_to_tsv.py sources.raw.json
 	python extracted_to_tsv.py sources.raw.json
 
-sources.raw.json: extract-sources-v3.py ../../../data/articles/relevant.metadata.clean.tsv
-	python extract-sources-v3.py ../../../data/articles/relevant.metadata.clean.tsv > sources.raw.json
+sources.raw.json: extract-sources-v3.py ../../../data/articles/articles.clean.tsv
+	python extract-sources-v3.py ../../../data/articles/articles.clean.tsv > sources.raw.json

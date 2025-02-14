@@ -1,4 +1,3 @@
-import csv
 from squidtools import util
 from sentence_transformers import SentenceTransformer
 

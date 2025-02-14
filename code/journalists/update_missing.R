@@ -7,7 +7,7 @@ source(here::here("code/setup.R"))
 
 df <- readRDS(here("code/journalists/authors.gr.rds"))
 
-names <- read_tsv(here("data/articles/relevant.metadata.clean.tsv")) %>%
+names <- read_tsv(here("data/articles/articles.clean.tsv")) %>%
     mutate(
         clean_name = tolower(author) %>%
             str_remove("^and ") %>%

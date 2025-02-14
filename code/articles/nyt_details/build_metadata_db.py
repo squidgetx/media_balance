@@ -14,7 +14,6 @@ class ArticleFailedException(Exception):
 
 start_year = 2012
 end_year = 2022
-API_KEY='58JuxwAhL6m69czgJdXjheGpLwVh4UH9'
 
 def query_nyt_api(qs):
     time.sleep(13)

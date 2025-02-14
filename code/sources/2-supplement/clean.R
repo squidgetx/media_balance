@@ -13,7 +13,7 @@ if (F) {
         write_tsv(
             here("code/sources/2-supplement/gov.sources.cat.validate.200.tsv")
         )
-} else {
+    # TODO move this
     validated <- read_tsv(here("code/sources/2-supplement/gov.sources.cat.validate.200.labeled.tsv"))
     n <- validated %>%
         filter(!is.na(human.label)) %>%
@@ -43,7 +43,7 @@ if (F) {
         write_tsv(
             here("code/sources/2-supplement/env.sources.cat.validate.200.tsv")
         )
-} else {
+    # TODO move this
     validated <- read_tsv(here("code/sources/2-supplement/env.sources.cat.validate.200.labeled.tsv"))
     n <- validated %>%
         filter(!is.na(human.label)) %>%
