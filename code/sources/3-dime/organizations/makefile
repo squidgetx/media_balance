@@ -16,6 +16,6 @@ maybes.ts.stg0.tsv: match-candidates.tsv orgs_cleaned.tsv
 
 # Depends on 1-dedup/orgs.cleaned.deduped.tsv
 # Takes 1.5 hours
-match-candidates.tsv: ../../1-dedup/orgs.clustered.tsv prepare_matching.R get-match-candidates.py
-	Rscript prepare_matching.R
-	python get-match-candidates.py  
+#match-candidates.tsv: ../../1-dedup/orgs.clustered.tsv prepare_matching.R get-match-candidates.py
+#	Rscript prepare_matching.R
+#	python get-match-candidates.py  

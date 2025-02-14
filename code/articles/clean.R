@@ -4,7 +4,7 @@ library(stringr)
 
 # First, assign the topic labels to the main dataset
 
-df <- read_tsv(here('data/articles/all_articles.metadata.tsv'))
+df <- read_tsv(here('code/articles/all_articles.metadata.tsv'))
 labels <- read_tsv(here('code/articles/topic-labels.tsv'))
 
 df.rel <- df %>% left_join(labels)
@@ -21,8 +21,6 @@ df.v0 <- df.rel %>% filter(label) %>% mutate(
     )
 ) %>% filter(!is.na(source))
 
-
-df.v0 %>% ggplot(aes(x=date, color=source)) + geom_bar(stat='count')
 
 # Investigate weird spikes in the data
 df.v0 %>% group_by(date, source) %>% summarise(n=n()) %>% arrange(desc(n))

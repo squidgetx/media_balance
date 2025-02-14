@@ -13,7 +13,7 @@ Be concise. End your answer with either "yes" or "no".
 
 async def label_lines(txt):
     message, cost = await gpt_utils_async.system_prompt(
-        IDENTIFY_PROMPT, txt, model="gpt-3.5-turbo"
+        IDENTIFY_PROMPT, txt, model="gpt-3.5-turbo", temp=0
     )
     label = None
     if "yes" in message.lower() and "no" not in message.lower():
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     reader = csv.DictReader(open(args.path), delimiter="\t")
     os.chdir(os.path.dirname(args.path))
     files = {row["filename"]: row["excerpt"] for row in reader}
-    files = {f:files[f] for f in files if files[f] is not None}
+    files = {f: files[f] for f in files if files[f] is not None}
 
     async def label(filename):
         lines = files[filename]
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     results = robust_task.async_robust_task(
         list(files.keys()),
         label,
-        progress_name='topic-label.progress.json',
+        progress_name="topic-label.progress.json",
     )
 
-    util.write_tsv(results, 'topic-labels.tsv')
+    util.write_tsv(results, "topic-labels.tsv")

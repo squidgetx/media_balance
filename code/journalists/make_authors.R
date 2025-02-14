@@ -25,7 +25,7 @@ keyword_re <- paste(title_keywords, collapse = "|")
 # Assign the "clean_name" object. This logic is also used in
 # clean_linkedin.py
 
-og_articles <- read_tsv(here("data/articles/relevant.metadata.clean.tsv"))
+og_articles <- read_tsv(here("code/articles/relevant.metadata.clean.tsv"))
 og_authors <- og_articles %>%
     filter(!is.na(author)) %>%
     mutate(

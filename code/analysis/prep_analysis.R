@@ -4,7 +4,7 @@ datadir <- "data/masterdata"
 
 sources <- read_tsv(here("code/sources/sources.tsv"))
 
-articles <- read_tsv(here("data/articles/articles.clean.tsv"))
+articles <- read_tsv(here("code/articles/articles.clean.tsv"))
 
 authors <- readRDS(here("code/journalists/authors.clean.rds")) %>% filter(!is.na(author_name))
 

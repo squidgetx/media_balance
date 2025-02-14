@@ -5,16 +5,13 @@ load(here("code/sources/3-dime/data/dime_recipients_1979_2022.rdata"))
 
 cand.pairs.raw <- read_tsv(
     here("code/sources/3-dime/politicians/match-candidates.tsv"),
-    show_col_types = F
 )
 pols <- read_tsv(
     here("code/sources/3-dime/politicians/politicians.states.tsv"),
-    show_col_types = F
 )
 
 dime.pols <- read_tsv(
     here("code/sources/3-dime/politicians/dime-politicians.tsv"),
-    show_col_types = F
 ) %>%
     group_by(Cand.ID) %>%
     summarize(
@@ -126,7 +123,7 @@ cfscores.agg %>% filter(
 )
 cfscores.agg %>% write_tsv(here("code/sources/3-dime/politicians/politician.cfscores.tsv"))
 
-sources <- read_tsv(here("code/sources/3-dime/organizations/sources.dime.orgs.tsv"), show_col_types = F)
+sources <- read_tsv(here("code/sources/3-dime/organizations/sources.dime.orgs.tsv"))
 sources.dime <- sources %>%
     mutate(pnl = tolower(person_name)) %>%
     left_join(

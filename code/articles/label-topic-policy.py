@@ -19,5 +19,6 @@ sqllm.apply_files(args.infile, args.outfile, {
     'model': 'gpt-4o-mini',
     'input_columns': ['excerpt'],
     'output_columns': ['policy_label_gpt'],
-    'prompt': IDENTIFY_PROMPT
+    'prompt': IDENTIFY_PROMPT,
+    'cache_filename': 'policy-label.progress.jsonl'
 })
