@@ -54,4 +54,12 @@ read_csv <- function(...) {
     readr::read_csv(..., show_col_types=F)
 }
 
+check_ <- function(a) {
+    if (gtools::invalid(a)) {
+        F
+    } else {
+        a
+    }
+}
+
 #source(here::here('code/setup.R'))

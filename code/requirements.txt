@@ -1,3 +1,2 @@
 squidtools
 tiktoken
-faiss-cpu

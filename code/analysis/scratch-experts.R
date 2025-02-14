@@ -1,6 +1,6 @@
 library(tidyverse)
 library(here)
-datadir <- 'data/masterdata2'
+datadir <- 'data/masterdata'
 sources <- read_tsv(here(datadir, "sources.tsv"))
 sources$category %>% table()
 s1 <- sources %>% group_by(year) %>% summarize(

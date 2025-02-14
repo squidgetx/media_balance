@@ -1,19 +1,12 @@
-import openai
 import csv
 import os
-import time
 import argparse
 import json
-import sys
-
-class SourceExtractionFailedException(Exception):
-    pass
-
-
 
 from squidtools import robust_task, gpt_utils_async, util
 
-openai.api_key = os.environ["OPENAI_KEY"]
+class SourceExtractionFailedException(Exception):
+    pass
 
 MAX_ATTEMPTS = 5
 SKIP_EXISTING = True

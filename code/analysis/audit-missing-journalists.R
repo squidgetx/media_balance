@@ -1,5 +1,5 @@
 source(here::here('code/setup.R'))
-datadir <- "data/masterdata2"
+datadir <- "data/masterdata"
 all.articles <- read_tsv(here(datadir, "articles.tsv"))
 all.sources <- read_tsv(here(datadir, "sources.tsv"))
 sources <- all.sources %>% filter(policy_label_gpt)

@@ -1,0 +1,235 @@
+---
+title: "Balance"
+---
+
+```{r include=F}
+source(here::here("code/analysis/load.R"))
+main <- sources %>%
+    calculate_balance(
+        types = c("org_category", "cfscore"),
+    )
+```
+
+# Descriptive
+
+```{r}
+ggarrange(plotlist = list(
+    ggplot(main, aes(x = cfscore, fill = balance)) +
+        geom_histogram() +
+        theme_min,
+    ggplot(main, aes(x = cfscore.sd, fill = balance)) +
+        geom_histogram() +
+        theme_min,
+    ggplot(main, aes(x = diff_normalized, fill = balance)) +
+        geom_histogram() +
+        theme_min
+), common.legend = T, legend = "bottom", nrow=1)
+ggsave(here("paper/figures/balance-cf-hists.png"), width = 8, height = 4)
+
+ggplot(main, aes(x = cfscore, y = cfscore.sd, color = balance)) +
+        geom_point(alpha = 0.3, stroke = NA) +
+        theme_min
+ggsave(here("paper/figures/balance-cfscoresd-scatter.png"), width = 6, height = 4)
+```
+
+# Main Result #1: Organization Balance decreases over time
+
+```{r}
+main %>% ggplot(aes(x = date, y = as.numeric(balance))) +
+    geom_smooth(method = "gam") +
+    theme_min +
+    labs(y = "Balance", x = "Date")
+ggsave(here("paper/figures/balance-overview-gam.png"), width = 6, height = 4)
+```
+
+## Robust to SD as alternate outcome
+
+```{r}
+main %>% ggplot(aes(x = date, y = cfscore.sd)) +
+    geom_smooth(method = "loess") +
+    geom_point(alpha=0.1) + 
+    theme_min
+```
+
+## Robust to varying imputation strategy
+
+Overall, the negative time trend is robust to all of our imputation strategies.
+Our main specification uses matched cfscores and includes imputed cfscores when data is missing 
+Other specifications including only using the organization classifications, the raw DIME data (no imputation), 
+and exclusively using imputation tell a similar story
+
+```{r}
+specs <- list(
+    list("types" = c("org_category"), cfscore.options = list(), label = "Category only"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(impute.off = T, nwd.sd.thres = 0.8), label = "Category + raw cfscore"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(nwd.sd.thresh = 0.8), label = "Category + imputed cfscore"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(impute.all = T, nwd.sd.thresh = 0.8), label = "Category + total imputation")
+)
+df <- lapply(specs, \(t) {
+    sources %>%
+        calculate_balance(
+            types = t$types,
+            cfscore.options = t$cfscore.options,
+        ) %>%
+        mutate(label = t$label)
+}) %>% bind_rows()
+df %>% ggplot(aes(x = date, y = as.numeric(balance), color = label)) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Specification")
+ggsave(here("paper/figures/balance-overview-robust-1.png"), width = 6, height = 4)
+```
+
+## Robustness increases when dropping bad matches 
+
+We define a bad match as one where there the DIME ideology scores for an organization are widely varying, 
+ie when the SD of the scores exceeds a certain threshold.
+Our main specification uses a threshold of 0.8
+We can see how the relationship changes with different thresholds for determining "widely varying"
+The following chart shows that the negative time trend is increasingly apparent the more strictly 
+we reject bad matches.
+
+```{r}
+df <- lapply(seq(0.1, 1, 0.1), \(x) {
+    sources %>%
+        calculate_balance(
+            types = c("org_category", "cfscore"),
+            cfscore.options = list(nwd.sd.thresh = x),
+        ) %>%
+        mutate(label = x)
+}) %>% bind_rows()
+df %>% ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(label))) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Specification")
+ggsave(here("paper/figures/balance-overview-robust-2.png"), width = 6, height = 4)
+```
+
+## Robustness to varying left/right threshold
+
+Our measure of balance depends on an arbitrary threshold 't'
+Organizations with cfscore > t and cfscore < -t are classified as "right" and "left"
+Our main specification uses a t=0.2 but results are robust to other specifications of t.
+
+```{r}
+seq(0.1, 0.6, 0.1) %>%
+    lapply(\(t) {
+        sources %>%
+            group_by(textfile, date) %>%
+            calculate_balance(
+                types = c("org_category", "cfscore"),
+                cfscore.options = list(nwd.sd.thresh = 0.8),
+                thresh = t
+            ) %>%
+            mutate(thresh = t)
+    }) %>%
+    bind_rows() %>%
+    ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(thresh))) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Threshold")
+ggsave(here("paper/figures/balance-overview-robust-3.png"), width = 6, height = 4)
+```
+
+## NOT ROBUST to including politicians or topics 
+
+```{r}
+df <- list(
+    c("org_category", "cfscore"),
+    c("org_category", "cfscore", "party"),
+    c("org_category", "cfscore", "topic"),
+    c("org_category", "cfscore", "party", "topic")
+) %>%
+    lapply(\(t) {
+        sources %>%
+            calculate_balance(
+                types = t,
+            ) %>%
+            mutate(types = paste0(t, collapse = ","))
+    }) %>%
+    bind_rows()
+df %>%
+    ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(types))) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Threshold")
+```
+
+### Politicians and SD
+
+Interesting pattern with SD. Parabolic shape...
+
+```{r}
+specs <- list(
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(nwd.sd.thresh = 0.8), label = "Default"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(nwd.sd.thres = 0.8, pols = T), label = "Include Politician CFscore")
+)
+df <- specs %>%
+    lapply(\(t) {
+        sources %>%
+            calculate_balance(
+                types = t$types,
+                cfscore.options = t$cfscore.options,
+            ) %>%
+            mutate(label = t$label)
+    }) %>%
+    bind_rows()
+df %>% ggplot(aes(x = date, y = as.numeric(cfscore.sd), color = label)) +
+    geom_smooth(method = "loess") +
+    theme_min +
+    labs(x = "Date", y = "SD", color = "model")
+```
+
+# Related descriptive analysis
+
+## Variation by Newspaper
+
+Maybe most notably, NYT doesn't follow the trend. Others are somewhat similar.
+WSJ is the most balanced overall probably because of business focus.
+
+SD outcome looks a little better across the board but not for all
+
+```{r}
+ggarrange(plotlist = list(
+    main %>% ggplot(aes(x = date, y = as.numeric(balance), color = source)) +
+        geom_smooth(method = "loess", se = F) +
+        labs(y = "Balance", x = "Date", color = "Newspaper") +
+        theme_min,
+    main %>% ggplot(aes(x = date, y = as.numeric(cfscore.sd), color = source)) +
+        geom_smooth(method = "loess", se = F) +
+        labs(y = "Source SD", x = "Date", color = "Newspaper") +
+        theme_min
+), common.legend = T, legend = "bottom")
+```
+
+## Mean Slant over Time
+```{r}
+main %>%
+    ggplot(aes(x = date, y = cfscore)) +
+    geom_smooth(method = "loess") +
+    labs(
+        y = "Mean Slant (cfscore)",
+        x = "Date"
+    ) +
+    theme_min
+ggsave(here("paper/figures/slant-overview.png"), width = 6, height = 4)
+```
+
+## Balance/Slant Scatter Plot
+```{r}
+main %>%
+    filter(!is.na(balance)) %>%
+    ggplot(aes(x = date, y = cfscore, color = balance, stroke = NA)) +
+    geom_hline(yintercept = 0, lty = 2) +
+    geom_point(alpha = 0.1, size = 3, position = position_jitter(height = 0.04)) +
+    geom_smooth(se = F) +
+    labs(y = "Slant (cfscore)", x = "Date", color = "Balance") +
+    theme_min
+ggsave(here("paper/figures/balance-slant-scatter.png"), width = 6, height = 4)
+```
+
+# Conclusions
+
+1. We show balance in coverage as defined by types and ideology of organizations decreases over time and is robust to many modeling specifications   
+2. The pattern does not show when we look at politicians. The SD outcome shows something interesting though, where it increases until ~2017 then drops a lot. This is consistent with a story where journalists increasingly cite Republicans/Trump in early years of the administration then veer sharply away. The balance data is a bit messier but may show something similar (sharp decline after 2020 instead of 2017/2018)
+3. The pattern does not show when we look at topics. The topic measure is pretty coarse so it could be a measurement error. Alternatively, it could have an interesting substantive interpretation where Biden admin pivots to business oriented green infrastructure regulation. So people talk a lot about business benefits but they aren't right wing/fossil fuel groups. More renewable energy companies or something.

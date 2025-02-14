@@ -6,6 +6,7 @@ df <- read_tsv(here("code/sources/6-clean/sources.clean.tsv")) %>% mutate(
     category = case_when(
         gov_category == "US politician" ~ "Politician",
         gov_category == "US bureaucrat" ~ "Bureaucrat",
+        category == "government" & !is.na(pol_party) ~ "Politician", 
         category == "government" ~ "International",
         category == "citizen" ~ "Other",
         TRUE ~ stri_trans_totitle(category)
@@ -77,7 +78,8 @@ wh <- df.articles %>%
             year(date) <= 2016 ~ admin_ids["Obama"],
             year(date) <= 2020 ~ admin_ids["Trump"],
             TRUE ~ admin_ids["Biden"]
-        )
+        ),
+        gov_category = 'US politician'
     ) %>%
     rows_update(org_info, by = "org_id")
 # Also update the pol party of each of the admins

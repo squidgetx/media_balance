@@ -7,32 +7,8 @@ output:
 ---
 
 ```{r include=F}
-# Set up analysis, load packages and data
-source(here::here('code/setup.R'))
+source(here::here("code/analysis/load.R"))
 ```
-```{r}
-# Load sources, articles, journos
-datadir <- "data/masterdata2"
-all.articles <- read_tsv(here(datadir, "articles.tsv"))
-all.sources <- read_tsv(here(datadir, "sources.tsv"))
-sources <- all.sources %>% filter(policy_label_gpt)
-articles <- all.articles %>% filter(policy_label_gpt)
-authors <- articles %>%
-    group_by(author_name, elite_undergrad_ivyplus, edu.undergrad, edu.has_postgrad, is_career, field.journo, age_est_2017, gender, race.nonwhite) %>%
-    summarize(n = n()) %>%
-    filter(!is.na(author_name))
-articles.repna <- articles %>% mutate(
-    field.journo = replace_na(field.journo, FALSE),
-    elite_undergrad_ivyplus = replace_na(elite_undergrad_ivyplus, FALSE),
-    edu.has_postgrad = replace_na(edu.has_postgrad, FALSE),
-)
-sources.repna <- sources %>% mutate(
-    field.journo = replace_na(field.journo, FALSE),
-    elite_undergrad_ivyplus = replace_na(elite_undergrad_ivyplus, FALSE),
-    edu.has_postgrad = replace_na(edu.has_postgrad, FALSE),
-)
-```
-
 
 # Basic Descriptives
 ## Ns
@@ -59,46 +35,45 @@ articles %>%
         y = "Number of Articles",
         color = "Newspaper"
     ) +
-    theme(
-        panel.grid.minor = element_blank()
-    )
+    theme_min
 ggsave(here("paper/figures/time_trend_n_articles.png"), width = 6, height = 4)
 ```
+
 ## Sources
 
 ### Number per Article
-```{r}
-articles$n %>% hist()
-summary(articles$n)
+```{r, fig.height=4}
+articles$n_srcs %>% hist()
+summary(articles$n_srcs)
 ```
 
 ### Number per Article over Time
-```{r}
+```{r, fig.height=4}
 sources %>%
     group_by(year) %>%
     summarize(n = n(), n_articles = length(unique(filename)), avg_sources = n / n_articles) %>%
     ggplot(aes(x = year, y = avg_sources)) +
     geom_line() +
     scale_x_continuous(breaks = seq(2012, 2022, 2)) +
-    theme_bw()
+    theme_min
 
-sources %>%
-    group_by(year > 2016) %>%
-    summarize(n = n(), n_articles = length(unique(filename)), avg_sources = n / n_articles)
+etable(feols(n_srcs ~ post2016, data = articles)) %>% htmlTable()
 ```
 
 ### Number per Outlet
 
-```{r}
+```{r, fig.height=4}
 sources %>%
     group_by(source) %>%
-    summarize(n = n(), n_articles = length(unique(filename)), avg_sources = n / n_articles)
+    summarize(n = n(), n_articles = length(unique(filename)), avg_sources = n / n_articles) %>%
+    kable()
 
 sources %>%
     group_by(source, year) %>%
     summarize(n = n(), n_articles = length(unique(filename)), avg_sources = n / n_articles) %>%
     ggplot(aes(x = year, y = avg_sources, color = source)) +
-    geom_line()
+    geom_line() +
+    theme_min
 ```
 
 ```{r}
@@ -136,1031 +111,12 @@ sub.cats <- table(sources$category2) %>%
         Freq = paste0(round(100 * Freq, digits = 1), "%")
     )
 
-rbind(gen.cats, sub.cats) %>% distinct()
+rbind(gen.cats, sub.cats) %>%
+    distinct() %>%
+    kable()
 ```
 
-### Top Source DIME scores 
-
-```{r}
-dt <- sources %>%
-    filter(is.na(gov_category)) %>%
-    group_by(org_id) %>%
-    summarize(
-        n = n(), cfscore = mean(cfscore, na.rm = T), name = first(organization_name), category.slant = first(category.slant)
-    ) %>%
-    arrange(desc(n)) %>%
-    filter(!is.na(cfscore)) %>%
-    head(50) %>%
-    arrange(n) %>%
-    mutate(rn = 51 - row_number(), n_size = n + 10)
-dt %>% ggplot(aes(x = cfscore, size = sqrt(n), y = n, color = cfscore)) +
-    theme_bw() +
-    # scale_y_continuous(limits = c(-1, 0.8)) +
-    scale_y_log10() +
-    # scale_y_continuous(trans='reverse') +
-    scale_x_continuous(limits = c(-1.5, 1.2)) +
-    scale_color_gradient(low = "blue", high = "red") +
-    geom_vline(xintercept = 0, lty = "dashed") +
-    theme(panel.grid = element_blank(), axis.text.y = element_blank()) +
-    labs(x = "DIME Ideology", y = "") +
-    geom_text_repel(
-        data = subset(dt, category.slant != "other" & !(name %in% c("The Associated Press", "Associated Press", "California"))),
-        aes(x = cfscore, label = name),
-        direction = "y",
-        min.segment.length = 999
-    ) +
-    guides(size = "none", color = "none", fill = "none")
-ggsave(here("paper/figures/dime-scatter-100.png"), width = 10, height = 6)
-```
-
-```{r}
-# scratch
-```
-
-### Top DIME over time
-
-```{r}
-dt <- sources %>%
-    filter(is.na(gov_category)) %>%
-    group_by(org_id) %>%
-    summarize(
-        n = n(), cfscore = mean(cfscore, na.rm = T), name = first(organization_name), category.slant = first(category.slant)
-    ) %>%
-    arrange(desc(n)) %>%
-    filter(!is.na(cfscore)) %>%
-    head(7)
-    dt
-sources %>% filter(org_id %in% dt$org_id) %>% group_by(year, organization_name, org_id, cfscore) %>% summarize(n=n()) %>% ggplot(aes(
-    x=year, y=n, color=cfscore < 0, lty=organization_name
-)) +
-geom_smooth(se=F)
-```
-
-### Politicians 
-
-```{r}
-pres <- sources %>%
-    mutate(
-        pres = case_when(
-            str_detect(person_name, "Biden") ~ "Biden",
-            str_detect(person_name, "Obama") ~ "Obama",
-            str_detect(person_name, "Trump") ~ "Trump",
-            category.slant %in% c("Democrat", "Republican") ~ category.slant,
-            TRUE ~ NA
-        )
-    )
-npy <- sources %>%
-    group_by(year) %>%
-    summarize(npy = n())
-pres %>%
-    group_by(year, pres) %>%
-    filter(!is.na(pres)) %>%
-    summarize(n = n()) %>%
-    ggplot(aes(x = year, y = n, color = pres)) +
-    geom_line() +
-    theme_bw()
-# Normalize by # of sources per year...
-pres %>%
-    group_by(year, pres) %>%
-    filter(!is.na(pres)) %>%
-    summarize(n = n()) %>%
-    left_join(npy) %>%
-    ggplot(aes(x = year, y = n / npy, color = pres, shape = pres)) +
-    geom_line() +
-    geom_point() +
-    scale_x_continuous(breaks = seq(2012, 2022, 4)) +
-    theme_bw()
-```
-
-## Journalists
-
-### Demographics
-```{r}
-ggarrange(plotlist = list(
-    authors %>% ggplot(aes(x = age_est_2017)) +
-        geom_histogram(),
-    authors %>% ggplot(aes(x = elite_undergrad_ivyplus)) +
-        geom_bar(stat = "count"),
-    authors %>% ggplot(aes(x = edu.has_postgrad)) +
-        geom_bar(stat = "count"),
-    authors %>% ggplot(aes(x = field.journo)) +
-        geom_bar(stat = "count"),
-    authors %>% ggplot(aes(x = gender)) +
-        geom_bar(stat = "count"),
-    authors %>% ggplot(aes(x = race.nonwhite)) +
-        geom_bar(stat = "count")
-))
-```
-
-### Demographics over time
-
-Unit of analysis: unique journalists per year
-
-```{r warning=F, message=F}
-journo.years <- articles %>%
-    group_by(author_name, year, elite_undergrad_ivyplus, edu.undergrad, edu.has_postgrad, is_career, field.journo, age_est, gender, race.nonwhite) %>%
-    summarize(n = n()) %>%
-    filter(!is.na(author_name))
-age.plt <- journo.years %>%
-    ggplot(aes(x = year, y = as.numeric(age_est > 35))) +
-    geom_smooth(method = "loess") +
-    labs(x = "Year", y = "Age > 35")
-ivy.plt <- journo.years %>%
-    ggplot(aes(x = year, y = as.numeric(elite_undergrad_ivyplus))) +
-    geom_smooth(method = "loess") +
-    labs(y = "Ivy League", x = "Year")
-fj.plt <- journo.years %>%
-    ggplot(aes(x = year, y = as.numeric(field.journo))) +
-    labs(y = "Journalism Degree", x = "Year") +
-    geom_smooth(method = "loess")
-
-pg.plt <- journo.years %>%
-    ggplot(aes(x = year, y = as.numeric(edu.has_postgrad))) +
-    labs(y = "Postgraduate Degree", x = "Year") +
-    geom_smooth(method = "loess")
-gender.plt <- journo.years %>%
-    ggplot(aes(x = year, y = as.numeric(gender == "female"))) +
-    labs(y = "Female", x = "Year") +
-    geom_smooth(method = "loess")
-race.plt <- journo.years %>%
-    ggplot(aes(x = year, y = as.numeric(race.nonwhite))) +
-    labs(y = "Nonwhite", x = "Year") +
-    geom_smooth(method = "loess")
-plts <- list(age.plt, ivy.plt, fj.plt, gender.plt, pg.plt, race.plt) %>%
-    lapply(function(p) {
-        p +
-            theme_bw() +
-            theme(panel.grid = element_blank()) +
-            scale_x_continuous(breaks = seq(2012, 2022, 2))
-    })
-ggarrange(plotlist = plts)
-ggsave(here("paper/figures/journo-agg-2.png"), width = 10, height = 6)
-```
-
-
-# Ideological Sources
-```{r}
-articles %>%
-    pivot_longer(cols = c("n_right_dime_other", "n_left_dime_other", "n_rep", "n_dem", "n_env", "n_ff", "n_center_total")) %>%
-    ggplot(aes(x = date, y = value, color = name)) +
-    geom_smooth(se = F) +
-    theme_bw()
-```
-
-```{r}
-sources %>%
-    group_by(year, category.slant) %>%
-    summarize(n = n()) %>%
-    ggplot(aes(x = year, y = n, color = category.slant, lty = category.slant)) +
-    geom_smooth(se = F) +
-    theme_bw()
-sources_per_year <- sources %>%
-    group_by(year) %>%
-    summarize(year.n = n())
-sources %>%
-    group_by(year, category.slant) %>%
-    summarize(n = n()) %>%
-    left_join(sources_per_year) %>%
-    ggplot(aes(x = year, y = n / year.n, color = category.slant, lty = category.slant)) +
-    geom_line() +
-    theme_bw()
-```
-
-# Article Slant and Balance 
-
-## Slant/Balance Histogram
-
-```{r}
-ggplot(articles, aes(x = ideo.mean.i, fill = bal.at_least_one_both_sides)) +
-    geom_histogram() +
-    theme_bw()
-ggplot(articles, aes(x = bal.diff_lr_normalized_nonabs, fill = bal.at_least_one_both_sides)) +
-    geom_histogram() +
-    theme_bw()
-```
-
-## Slant and Balance Over Time
-
-```{r}
-# With loess
-slant_overview_plt <- articles %>%
-    pivot_longer(
-        cols = c("ideo.mean.i", "ideo.mean.pols", "ideo.mean.i.orgs"),
-    ) %>%
-    mutate(
-        name = dplyr::recode(name, ideo.mean.i = "All", "ideo.mean.pols" = "Politicians", "ideo.mean.i.orgs" = "Organizations"),
-        size = case_when(name == "All" ~ 1.5, TRUE ~ 1),
-        lty = case_when(name == "All" ~ 1, TRUE ~ 2)
-    ) %>%
-    ggplot(aes(x = date, y = value, color = name, lty = as.factor(lty))) +
-    geom_smooth(se = F, method = "loess") +
-    theme_bw() +
-    theme(
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-    ) +
-    guides(
-        linetype = "none",
-        size = "none"
-    ) +
-    labs(
-        y = "Mean article slant",
-        x = "Year",
-        color = "Slant Type"
-    )
-```
-
-```{r}
-balance_plt <- articles %>%
-    pivot_longer(cols = c("balance_all", "balance_ff_env", "balance_rep_dem")) %>%
-    mutate(
-        name = dplyr::recode(name, balance_all = "All", balance_ff_env = "Organizations", balance_rep_dem = "Politicians"),
-        size = case_when(name == "All" ~ 1.5, TRUE ~ 1),
-        lty = case_when(name == "All" ~ 1, TRUE ~ 2)
-    ) %>%
-    ggplot(aes(x = date, y = as.numeric(value), color = name, lty = as.factor(lty))) +
-    geom_smooth(se = F, method = "loess") +
-    theme_bw() +
-    theme(
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-    ) +
-    guides(
-        linetype = "none",
-        size = "none"
-    ) +
-    labs(
-        y = "Proportion of balanced articles",
-        x = "Year",
-        color = "Slant Type"
-    )
-ggarrange(plotlist = list(slant_overview_plt, balance_plt), common.legend = T, legend = "bottom")
-ggsave(here("paper/figures/slant-balance-overview.png"), width = 8, height = 5)
-```
-
-## Article Balance (Ratio)
-```{r}
-articles %>% ggplot(aes(x = date, y = as.numeric(bal.diff_lr_normalized > 0))) +
-    geom_smooth() +
-    theme_bw()
-```
-
-## Slant SD
-```{r}
-articles$ideo.sd.i %>% hist
-ggplot(articles, aes(x=date, y=ideo.sd.i)) + geom_smooth()
-# Really interesting shape, although the magnitude is maybe not as large?
-# Hard to interpret move from 0.65SD peak to 0.55 dip
-ggarrange(plotlist=list(
-    ggplot(articles, aes(x=date, y=ideo.sd.orgs)) + geom_smooth(),
-    ggplot(articles, aes(x=date, y=ideo.sd.pols)) + geom_smooth()
-))
-# Mostly driven by orgs...
-
-ggplot(articles, aes(x=date, y=ideo.sd.i, color=source)) + geom_smooth(se=F)
-# Wow that's kinda interesting for sure
-```
-
-## Slant over Time by Outlet
-```{r}
-articles %>% ggplot(aes(x = date, y = ideo.mean.i, color = source)) +
-    geom_smooth(se = F, method = "loess") +
-    labs(title = "Article slant by average organization DIME score")
-```
-
-### Business vs Environmental Groups
-
-```{r}
-articles %>% ggplot(aes(x = date, y = ideo.mean.i.orgs, color = source)) +
-    geom_smooth(se = F, method = "loess")
-```
-
-### Democrat and Republican Politicians
-
-```{r}
-articles %>% ggplot(aes(x = date, y = ideo.mean.pols, color = source)) +
-    geom_smooth(se = F, method = "loess")
-```
-
-# Journalist characteristics and article slant/balance
-
-```{r}
-make_fmla <- function(y, covariates, festring = "| year + source") {
-    covariate_str <- paste0(covariates, collapse = "+")
-    as.formula(paste(y, "~", covariate_str, festring))
-}
-make_models <- function(df, yvars, covariates, festring = "| year + source", cluster = "author_name") {
-    lapply(yvars, \(y) {
-        feols(make_fmla(y, covariates, festring), data = df, cluster = cluster)
-    })
-}
-non_edu_covars <- c(
-    "(age_est_2017 > 30)",
-    "gender",
-    "race.nonwhite"
-)
-j_covars <- c(
-    "elite_undergrad_ivyplus",
-    "edu.has_postgrad",
-    "field.journo",
-    non_edu_covars
-)
-models <- c(
-    make_models(articles, c("n", "n_unique_source_category"), j_covars),
-    make_models(articles, c("balance_all", "ideo.mean.i", "ideo.sd.i"), c(j_covars, "n"))
-)
-etable(models)
-etable(c(
-    make_models(articles.repna, c("balance_all", "ideo.mean.i", "ideo.sd.i"), c("elite_undergrad_ivyplus*gender", "n"))
-))
-
-# Basically same results with sources as the unit of analysis
-c(
-    make_models(sources, c("cfscore"), c(j_covars)),
-    make_models(sources.repna, c("cfscore"), c(j_covars))
-) %>% etable()
-```
-
-## Alternate Specification: No journalism field
-
-```{r}
-j_covars2 <- c(
-    "elite_undergrad_ivyplus",
-    "edu.has_postgrad",
-    non_edu_covars
-)
-models.alt.nj <- c(
-    make_models(articles, c("n", "n_unique_source_category"), j_covars2),
-    make_models(articles, c("balance_all", "ideo.mean.i"), c(j_covars2, "n"))
-)
-etable(models.alt.nj)
-```
-
-
-## Alternate Specification: NA edu fields set to default
-```{r}
-articles2 <- articles %>% mutate(
-    field.journo = replace_na(field.journo, FALSE),
-    elite_undergrad_ivyplus = replace_na(elite_undergrad_ivyplus, FALSE),
-    edu.has_postgrad = replace_na(edu.has_postgrad, FALSE),
-)
-models.alt.repna <- c(
-    make_models(articles2, c("n", "n_unique_source_category"), j_covars),
-    make_models(articles2, c("balance_all", "ideo.mean.i"), c(j_covars, "n"))
-)
-models.alt.repna.nofe <- c(
-    make_models(articles2, c("n", "n_unique_source_category"), j_covars, festring = "| year"),
-    make_models(articles2, c("balance_all", "ideo.mean.i"), c(j_covars, "n"), festring = "| year")
-)
-etable(models.alt.repna)
-```
-
-## Coefficient Graph for all specifications
-
-```{r}
-all.models <- c(models, models.alt.nj, models.alt.repna, models.alt.repna.nofe)
-plot_models <- function(models, title) {
-    mtypes <- c("Standard", "No Education Field", "Replace NAs with Defaults", "No Newspaper Fixed Effect")
-    ggcoefplot(as.list(models)) +
-        coord_flip() +
-        scale_color_discrete(labels = mtypes) +
-        scale_shape_discrete(labels = mtypes) +
-        labs(title = title) +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        guides(fill = "none")
-}
-ggarrange(
-    plotlist = list(
-        plot_models(all.models[seq(1, length(all.models), 4)], title = "Number of Sources"),
-        plot_models(all.models[seq(2, length(all.models), 4)], title = "Number of Unique Source Types"),
-        plot_models(all.models[seq(3, length(all.models), 4)], title = "Balance"),
-        plot_models(all.models[seq(4, length(all.models), 4)], title = "Slant")
-    ),
-    common.legend = T,
-    legend = "bottom"
-)
-ggsave(here("paper/figures/coefplot-robust.png"), width = 12, height = 15)
-```
-
-```{r, comment=NA}
-etable(models.alt.repna, tex = TRUE, digits = 2, fitstat = c("n"))
-```
-
-## Coefficient plot for best specification
-```{r}
-ggcoefplot(as.list(c(models[1], models[2]))) +
-    # scale_x_discrete(limits = rev, labels = rev(c("Elite Undergrad", "Postgrad", "Journalism Degree", "Age > 30", "Male", "Non White", "Number of Sources"))) +
-    # scale_color_discrete(labels=c('Article Slant', 'Article Balance')) +
-    # scale_shape_discrete(labels=c('Article Slant', 'Article Balance')) +
-    coord_flip() +
-    labs(title = "") +
-    theme(
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()
-    ) +
-    guides(fill = "none")
-ggcoefplot(as.list(c(models[3], models[4]))) +
-    # scale_x_discrete(limits = rev, labels = rev(c("Elite Undergrad", "Postgrad", "Journalism Degree", "Age > 30", "Male", "Non White", "Number of Sources"))) +
-    # scale_color_discrete(labels=c('Article Slant', 'Article Balance')) +
-    # scale_shape_discrete(labels=c('Article Slant', 'Article Balance')) +
-    coord_flip() +
-    labs(title = "") +
-    theme(
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()
-    ) +
-    guides(fill = "none")
-ggsave(here("paper/figures/main-coefplot.png"), width = 6, height = 7)
-```
-#### Robustness check to age threshold
-
-```{r}
-vars <- c(
-    "gender",
-    "race.nonwhite",
-    "elite_undergrad_ivyplus",
-    "edu.has_postgrad",
-    "field.journo"
-)
-est_with_age_thresh <- function(thresh) {
-    var <- paste0("(age_est_2017 > ", thresh, ")")
-    models <- make_models(articles, c("ideo.mean.i", "balance_all"), c(vars, var, "n"))
-    ideo.age <- models[[1]]$coeftable[6, ]
-    balance.age <- models[[2]]$coeftable[6, ]
-    res <- as.data.frame(rbind(ideo.age, balance.age))
-    res$yvar <- c("ideo.mean.i", "balance_all")
-    res$thresh <- thresh
-    res
-}
-res <- bind_rows(lapply(seq(20, 50), est_with_age_thresh))
-res %>% ggplot(aes(x = thresh, y = Estimate, color = yvar, ymin = Estimate - 1.96 * `Std. Error`, ymax = Estimate + 1.96 * `Std. Error`)) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_point() +
-    geom_errorbar(position = position_dodge()) +
-    theme_bw()
-ggsave(here("paper/figures/age_robustness.png"), width = 8, height = 6)
-```
-
-## Journalist Characteristics and Balance Ratio 
-
-```{r}
-ts <- seq(0, 0.95, 0.05)
-ms <- sapply(ts, \(t) paste0("bal.diff_lr_normalized>", t))
-tmodels <- make_models(articles2, ms, c(j_covars))
-coefs <- lapply(ts, \(t) {
-    df <- as.data.frame(tmodels[[t * 10 + 1]]$coeftable)
-    df$t <- t
-    df$x <- rownames(df)
-    df
-}) %>% bind_rows()
-ggplot(coefs, aes(x = t, y = `Estimate`, ymin = `Estimate` - 1.96 * `Std. Error`, ymax = `Estimate` + 1.96 * `Std. Error`, color = `Pr(>|t|)` < 0.05)) +
-    geom_point() +
-    geom_errorbar(width = 0) +
-    geom_hline(yintercept = 0) +
-    theme_bw() +
-    facet_wrap(~x) +
-    labs()
-# Journalism vaguely associated with higher diff
-# Older less associated
-# Ivyleaguers are more likely to be slightly biased but not super biased
-# Same for ninwhites
-# No gender effect
-
-# I guess the other thing we should look at is whether its a left or right imbalance...
-ts <- seq(-0.95, 0.95, 0.1)
-ms <- sapply(ts, \(t) paste0("bal.diff_lr_normalized_nonabs", ifelse(t < 0, " < ", " > "), t))
-feols(bal.diff_lr_normalized_nonabs < -0.5 ~ elite_undergrad_ivyplus, data = articles2)
-tmodels <- make_models(articles2, ms, c(j_covars))
-coefs <- lapply(seq(1, length(ts)), \(t) {
-    df <- as.data.frame(tmodels[[t]]$coeftable)
-    df$t <- ts[[t]]
-    df$x <- rownames(df)
-    df
-}) %>% bind_rows()
-ggplot(coefs, aes(x = t, y = `Estimate`, ymin = `Estimate` - 1.96 * `Std. Error`, ymax = `Estimate` + 1.96 * `Std. Error`, color = `Pr(>|t|)` < 0.05)) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_point() +
-    geom_errorbar(width = 0) +
-    geom_hline(yintercept = 0) +
-    theme_bw() +
-    scale_x_reverse() +
-    scale_color_manual(values = c("#888888", "cyan3")) +
-    facet_wrap(~x) +
-    labs()
-# So this tells us that... Ivy league Js and older Js are more likely to write
-# articles that include more right leaning sources.. but not a LOT more just a bit more
-# This comes from the estimates closer to 0 as the threshold moves down
-# Older J's are also less likely to write articles with more left leaning sources
-# Nonwhites are almost more likely to write aticles with a couple more left leaning sources (not statsig though)
-
-
-# Okay and then another possibility we can look at is basically
-# who is more likely to write an article that is actually unbalanced but looks balanced
-make_models(articles2, c(
-    "bal.diff_lr_normalized > 0.25 & bal.at_least_one_both_sides",
-    "abs(ideo.mean.i) > 0.25 & bal.at_least_one_both_sides"
-), c(j_covars))
-
-# Conditional on writing a biased article, elite and journos are more likely
-# to include an opposing view. this could mean they are more sophisitcated essentially?
-make_models(articles2 %>% filter(bal.diff_lr_normalized > 0), c(
-    "bal.at_least_one_both_sides"
-), c(j_covars))
-make_models(articles2 %>% filter(bal.diff_lr_normalized == 0), c(
-    "!is.na(bal.at_least_one_both_sides)"
-), c(j_covars))
-
-ggplot(articles2, aes(x = bal.diff_lr_normalized_nonabs, fill = bal.at_least_one_both_sides)) +
-    geom_histogram() +
-    facet_wrap(~elite_undergrad_ivyplus) +
-    scale_x_reverse()
-# Yeah so the ivy league ppl basically are more likely to include both sides
-
-# Reverse isn't true - conditioning on including both sides doesn't increase likelihood of slant
-make_models(articles2 %>% filter(bal.at_least_one_both_sides), c(
-    "bal.diff_lr_normalized > 0.25"
-), c(j_covars))
-```
-
-## Source competition
-
-```{r}
-author.sources <- sources %>%
-    group_by(author_name, org_id) %>%
-    summarize(
-        n = n(),
-    )
-author.sources.t <- sources %>%
-    group_by(author_name) %>%
-    summarize(total.n = n(), ideo.mean.i = mean(cfscore, na.rm = T))
-a.s <- author.sources %>%
-    left_join(author.sources.t) %>%
-    mutate(
-        s = n / total.n * 100
-    )
-a.s
-library(hhi)
-library(purrr)
-compute_hhi <- function(df) {
-    author_name <- df$author_name
-    hhi <- sum(df$s^2)
-    data.frame(author_name, hhi)
-}
-df_hhi <- a.s %>%
-    group_split(author_name, .keep = TRUE) %>%
-    map(compute_hhi) %>%
-    bind_rows() %>%
-    distinct()
-nrow(df_hhi)
-df_hhi$hhi %>% hist()
-df_hhi$hhi %>% summary()
-authors <- authors %>%
-    left_join(df_hhi) %>%
-    left_join(a.s)
-etable(
-    # Ivy league, postgrads, but also younger Js have more diverse sources
-    c(lapply(c("hhi", "ideo.mean.i"), \(y) {
-        feols(make_fmla(y, j_covars, ""), data = authors)
-    }),
-    list(feols(make_fmla('cfscore', j_covars, ""), data = sources))
-    )
-)
-```
-
-
-## DiD (Control - younger, less educated journalists)
-
-The idea behind this DiD specification is that Trump's presidency "activated" latent slant.
-We test whether journalists who are demographieally more likely to believe in the "participant" press 
-altered their coverage after Trump's presidency *compared to their counterparts*.
-
-Parallel trends holds, suggesting that these two groups of journalists did not behave differently
-before Trump was elected. But after, the younger and less educated journalists slanted their coverage leftward
-more than the older and more educated ones did.
-```{r}
-make_did <- function(df, refyear = 2016) {
-    iq.model <- feols(
-        ideo.mean.i ~ field.journo + age_est_2017 + elite_undergrad_ivyplus + gender + race.nonwhite,
-        data = df
-    )
-    df$pred_ideo <- predict(iq.model, newdata = df)
-    df$treat <- df$pred_ideo < quantile(df$pred_ideo, na.rm = T, 0.5)
-    #
-    summary(iq.model)
-    df %>% ggplot(aes(x = age_est_2017, fill = treat)) +
-        geom_histogram()
-    df %>% ggplot(aes(x = field.journo, fill = treat)) +
-        geom_bar(stat = "count")
-    df %>% ggplot(aes(x = elite_undergrad_ivyplus, fill = treat)) +
-        facet_wrap(~field.journo) +
-        geom_bar(stat = "count")
-    df %>% ggplot(aes(x = elite_undergrad_ivyplus, fill = treat)) +
-        facet_wrap(~race.nonwhite) +
-        geom_bar(stat = "count")
-    raw.plt <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = as.numeric(ideo.mean.i), color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Mean article slant",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        ) +
-        scale_color_hue(label = c("Neutral", "Participant"))
-    raw.plt.b <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = as.numeric(balance_all), color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Article Balance",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        ) +
-        scale_color_hue(label = c("Neutral", "Participant"))
-    raw.plt.c <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = bal.diff_lr_normalized, color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Article Balance (Diff LR Normalized)",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        ) +
-        scale_color_hue(label = c("Neutral", "Participant"))
-    raw.plt.d <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = n, color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Number of Sources",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        ) +
-        scale_color_hue(label = c("Neutral", "Participant"))
-    raw.plt.e <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = n_unique_source_category, color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Number of Source Types",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        ) +
-        scale_color_hue(label = c("Neutral", "Participant"))
-    df <- df %>% mutate(
-        es.treat = case_when(
-            treat == 0 ~ 0,
-            treat == 1 & year < refyear ~ 0,
-            TRUE ~ 1
-        )
-    )
-    event_study_model <- feols(
-        ideo.mean.i ~ i(year, es.treat, ref = refyear) | year + author_name, df
-    )
-    event_study_model_balance <- feols(
-        as.numeric(balance_all) ~ i(year, es.treat, ref = refyear) | year + author_name, df
-    )
-    twfe <- feols(ideo.mean.i ~ (year > refyear) * treat | year + author_name, df)
-    list(
-        "raw_trends_plot" = raw.plt,
-        "article_balance_plot" = raw.plt.b,
-        "article_balance_plot2" = raw.plt.c,
-        "n_plot" = raw.plt.d,
-        "n_cat_plot" = raw.plt.e,
-        "event_study_model" = event_study_model,
-        "event_study_model_balance" = event_study_model_balance,
-        "twfe_model" = twfe
-    )
-}
-did <- make_did(articles, 2016)
-did$raw_trends_plot
-ggsave(here("paper/figures/did-raw-trends.png"), width = 6, height = 4)
-ggarrange(plotlist = list(
-    did$n_plot,
-    did$n_cat_plot,
-    did$article_balance_plot,
-    did$article_balance_plot2
-), common.legend = T)
-library(ggfixest)
-ggiplot(did$event_study_model) + labs(
-    title = "",
-    y = "Effect on Article Slant",
-    x = "Year"
-)
-# Event study plot
-ggsave(here("paper/figures/did-event-study-slant.png"), width = 8, height = 5)
-ggiplot(did$event_study_model_balance) + labs(
-    title = "",
-    y = "Effect on Article Balance",
-    x = "Year"
-)
-
-ggsave(here("paper/figures/did-event-study-balance.png"), width = 8, height = 5)
-
-# TWFE
-etable(did$twfe)
-```
-
-### DiD (Control - more conservative journalists)
-
-We can also run a DiD where the control group is pre-2016 conservative journalists.
-It suggests that previously liberal journalists actually became more conservative
-(or that previously conservative journalists became more liberal)
-during Trump's presidency. 
-
-I'm not exactly sure what this shows. The results are consistent with an alternative
-explanation that the most liberal journalists in the 2012-2016 period are just followers of 
-presidential cues - the liberal cohort returns to liberalness after Biden comes into office.
-
-```{r}
-authors_pre2017 <- articles %>%
-    filter(year < 2017) %>%
-    group_by(author_name) %>%
-    summarize(
-        ideo = mean(ideo.mean.i, na.rm = T)
-    ) %>%
-    filter(!is.na(ideo))
-
-
-authors_pre2017$ideo %>% summary()
-articles.2 <- articles %>%
-    left_join(authors_pre2017) %>%
-    mutate(
-        ideo_median = case_when(
-            ideo > median(articles$ideo.mean.i, na.rm = T) ~ "Conservative",
-            ideo <= median(articles$ideo.mean.i, na.rm = T) ~ "Liberal",
-            TRUE ~ "New"
-        ),
-        treat = case_when(
-            ideo_median == "Liberal" ~ TRUE,
-            ideo_median == "Conservative" ~ FALSE,
-            TRUE ~ NA
-        )
-    )
-articles.2 %>%
-    filter(ideo_median != "New") %>%
-    ggplot(aes(x = date, y = ideo.mean.i, color = ideo_median)) +
-    geom_smooth(se = T, method = "loess") +
-    geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed")
-
-# TWFE
-feols(ideo.mean.i ~ post2017 * treat | year + author_name, data = articles.2)
-feols(balance_all ~ post2017 * treat | year + author_name, data = articles.2)
-# Event study
-feols(ideo.mean.i ~ i(year, treat, ref = 2016) | year + author, articles.2) %>% coefplot()
-```
-
-# More did specs
-```{r}
-make_did2 <- function(df) {
-    iq.model <- feols(
-        ideo.mean.i ~ field.journo + age_est_2017 + elite_undergrad_ivyplus + gender + race.nonwhite,
-        data = df
-    )
-    df$pred_ideo <- predict(iq.model, newdata = df)
-    df$treat1 <- df$pred_ideo < quantile(df$pred_ideo, na.rm = T, 0.2)
-    df$treat2 <- df$pred_ideo > quantile(df$pred_ideo, na.rm = T, 0.8)
-    df$treat <- ifelse(df$treat1, "Most Liberal", ifelse(df$treat2, "Most Conservative", "Control"))
-    raw.plt <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = as.numeric(ideo.mean.i), color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Mean article slant",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        ) #+
-    # scale_color_hue(label = c("Neutral", "Participant"))
-    raw.plt.b <- df %>%
-        filter(!is.na(treat)) %>%
-        ggplot(aes(x = date, y = as.numeric(balance_all), color = treat, fill = treat)) +
-        geom_smooth(se = T, method = "loess") +
-        geom_vline(xintercept = as.Date("2016/01/01"), lty = "dashed") +
-        theme_bw() +
-        theme(
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank()
-        ) +
-        labs(
-            x = "Year",
-            y = "Article Balance",
-            color = "Predicted Type"
-        ) +
-        guides(
-            fill = "none"
-        )
-    # scale_color_hue(label = c("Neutral", "Participant"))
-    event_study_model <- feols(
-        ideo.mean.i ~ i(year, treat, ref = 2015) | year + author_name, df
-    )
-    event_study_model_balance <- feols(
-        as.numeric(balance_all) ~ i(year, treat, ref = 2016) | year + author_name, df
-    )
-    twfe <- feols(ideo.mean.i ~ (year > 2015) * treat | year + author_name, df)
-    list(
-        "raw_trends_plot" = raw.plt,
-        "article_balance_plot" = raw.plt.b,
-        "event_study_model" = event_study_model,
-        "event_study_model_balance" = event_study_model_balance,
-        "twfe_model" = twfe
-    )
-}
-did <- make_did2(articles)
-did$raw_trends_plot
-did$article_balance_plot
-# Event study plot
-did$event_study_model
-```
-
-```{r}
-df <- articles
-m.post <- feols(
-    ideo.mean.i ~ field.journo + age_est_2017 + elite_undergrad_ivyplus + gender + race.nonwhite | year + source,
-    data = df %>% filter(year > 2016)
-)
-m.pre <- feols(
-    ideo.mean.i ~ field.journo + age_est_2017 + elite_undergrad_ivyplus + gender + race.nonwhite | year + source,
-    data = df %>% filter(year <= 2016)
-)
-m.all <- feols(
-    ideo.mean.i ~ field.journo + age_est_2017 + elite_undergrad_ivyplus + gender + race.nonwhite | year + source,
-    data = df
-)
-m.all.nofe <- feols(
-    ideo.mean.i ~ field.journo + age_est_2017 + elite_undergrad_ivyplus + gender + race.nonwhite,
-    data = df
-)
-
-etable(list(m.pre, m.post, m.all, m.all.nofe))
-
-# Could do articles about trump vs articles not about trump?
-```
-
-# Appendix
-
-
-## Coverage/data quality
-
-How many articles do we have journalist education for?
-```{r}
-articles.with.author <- articles %>% filter(!is.na(author))
-articles.with.author.cfscore <- articles.with.author %>% filter(!is.na(ideo.mean.i))
-nrow(articles.with.author)
-nrow(articles.with.author.cfscore)
-
-table(!is.na(articles.with.author$edu.undergrad)) %>% prop.table()
-table(!is.na(articles.with.author$age_est)) %>% prop.table()
-
-with(
-    articles.with.author.cfscore,
-    table(!is.na(age_est) & !is.na(elite_undergrad_ivyplus) & !is.na(edu.has_postgrad) & !is.na(field.journo) & !is.na(gender) & !is.na(race.nonwhite))
-)
-
-nrow(articles.with.author.cfscore %>% filter(is.na(gender)))
-nrow(articles.with.author.cfscore %>% filter(is.na(race.nonwhite)))
-nrow(articles.with.author.cfscore %>% filter(is.na(field.journo)))
-nrow(articles.with.author.cfscore %>% filter(is.na(edu.has_postgrad)))
-nrow(articles.with.author.cfscore %>% filter(is.na(elite_undergrad_ivyplus)))
-nrow(articles.with.author.cfscore %>% filter(is.na(age_est)))
-
-
-articles.with.author %>%
-    filter(
-        is.na(age_est) | is.na(elite_undergrad_ivyplus) | is.na(edu.has_postgrad) | is.na(field.journo) | is.na(gender) | is.na(race.nonwhite)
-    ) %>%
-    group_by(
-        author_name, edu.undergrad, edu.field, edu.grad_year, edu.has_postgrad, exp.year_start, gender, race.nonwhite
-    ) %>%
-    summarize(n = n(), newspapers = paste0(unique(source), collapse = ",")) %>%
-    arrange(desc(n)) %>%
-    write_tsv("manual_01-07-25.tsv")
-```
-
-How many articles do we have journalist age for?
-
-```{r}
-```
-
-
-How many sources do we have DIME scores for?
-
-Proportion of all sources: 
-
-```{r}
-
-table(sources$cfscore.impute %>% is.na, useNA = "ifany") %>% prop.table()
-nrow(sources %>% filter(!is.na(cfscore))) / nrow(sources)
-table(
-    !is.na(sources$cfscore),
-    sources$category.slant
-)
-```
-
-Proportion of non government organizations: 
-
-```{r}
-n_eligible <- sources %>%
-    filter(tolower(category.slant) %in% c("advocacy", "environmental", "fossil fuel", "business", "democrat", "republican")) %>%
-    nrow()
-# Excludes bureaucrat, media, other
-nrow(sources %>% filter(!is.na(cfscore))) / n_eligible
-```
-
-## Imputation: DIME Ideology is Correlated to Source Category
-
-```{r}
-feols(cfscore ~ env_category, data = sources) %>%
-    etable()
-```
-
-## Histogram of measured article ideology
-
-```{r}
-articles %>% ggplot(aes(x = ideo.mean.i, color = source, fill = source)) +
-    geom_density(alpha = 0.1) +
-    geom_hline(yintercept = 0) +
-    theme_bw() +
-    theme(panel.grid = element_blank()) +
-    labs(x = "Ideology", y = "Density")
-ggsave(here("paper/figures/article-ideology-hist.png"), width = 6, height = 4)
-```
-
-## Histogram of predicted journalist ideology
-```{r}
-articles %>%
-    filter(!is.na(pred.ideo.q)) %>%
-    group_by(author_name) %>%
-    summarize(pred.ideo = first(pred.ideo), pred.ideo.q = first(pred.ideo.q)) %>%
-    ggplot(aes(x = pred.ideo, fill = pred.ideo.q)) +
-    geom_histogram() +
-    geom_hline(yintercept = 0) +
-    theme_bw() +
-    theme(panel.grid = element_blank()) +
-    labs(x = "Predicted Ideology", y = "Count", fill = "Quartile")
-ggsave(here("paper/figures/journo-pred-ideology-hist.png"), width = 6, height = 4)
-
-articles %>% ggplot(aes(x = pred.ideo, y = ideo.mean.i, color = pred.ideo.q)) +
-    geom_point()
-```
-
-## Distribution of source types by newspaper
+### Distribution of source types by newspaper
 
 ```{r}
 sources %>%
@@ -1236,69 +192,260 @@ ggsave(here("paper/figures/source-dist-2.png"), width = 8, height = 6)
 
 sources.s2$category.slant2 %>%
     table() %>%
-    prop.table()
-sources.s2 %>%
-    group_by(category.slant2) %>%
-    summarize(cfscore = mean(cfscore, na.rm = T))
+    prop.table() %>%
+    kable()
 ```
-
-## Bivariate analysis
 
 ```{r}
-models <- list(
-    feols(ideo.mean.i ~ elite_undergrad_ivyplus, data = articles),
-    feols(ideo.mean.i ~ edu.has_postgrad, data = articles),
-    feols(ideo.mean.i ~ field.journo, data = articles),
-    feols(ideo.mean.i ~ age_est > 40, data = articles),
-    feols(ideo.mean.i ~ gender, data = articles),
-    feols(ideo.mean.i ~ !race.nonwhite, data = articles),
-    feols(n_ff / (n_ff + n_env) ~ elite_undergrad_ivyplus, data = articles),
-    feols(n_ff / (n_ff + n_env) ~ edu.has_postgrad, data = articles),
-    feols(n_ff / (n_ff + n_env) ~ field.journo, data = articles),
-    feols(n_ff / (n_ff + n_env) ~ age_est > 40, data = articles),
-    feols(n_ff / (n_ff + n_env) ~ gender, data = articles),
-    feols(n_ff / (n_ff + n_env) ~ !race.nonwhite, data = articles),
-    feols(n_rep / (n_rep + n_dem) ~ elite_undergrad_ivyplus, data = articles),
-    feols(n_rep / (n_rep + n_dem) ~ edu.has_postgrad, data = articles),
-    feols(n_rep / (n_rep + n_dem) ~ field.journo, data = articles),
-    feols(n_rep / (n_rep + n_dem) ~ age_est > 40, data = articles),
-    feols(n_rep / (n_rep + n_dem) ~ gender, data = articles),
-    feols(n_rep / (n_rep + n_dem) ~ !race.nonwhite, data = articles),
-    feols(ideo.mean ~ elite_undergrad_ivyplus, data = articles),
-    feols(ideo.mean ~ edu.has_postgrad, data = articles),
-    feols(ideo.mean ~ field.journo, data = articles),
-    feols(ideo.mean ~ age_est > 40, data = articles),
-    feols(ideo.mean ~ gender, data = articles),
-    feols(ideo.mean ~ !race.nonwhite, data = articles)
-)
-res <- lapply(models, \(m) {
-    beta <- m$coeftable[2, 1]
-    sig <- m$coeftable[2, 4] < 0.05
-    xname <- rownames(m$coeftable)[[2]]
-    yname <- as.character(m$fml)[2]
-    list(
-        "beta" = beta,
-        "sig" = sig,
-        "x" = xname,
-        "y" = yname
-    )
-}) %>% bind_rows()
-res %>%
-    mutate(
-        beta = round(beta, 2),
-        fc = case_when(
-            sig & beta > 0 ~ "coral",
-            sig & beta < 0 ~ "cyan",
-            TRUE ~ "grey"
-        )
-    ) %>%
-    ggplot(aes(x = y, y = x, fill = fc, label = beta)) +
-    geom_tile() +
-    geom_text(size = 8) +
-    scale_fill_manual(values = c("coral", "cyan3", "grey"))
+articles$author_name %>% unique %>% length
+articles$author_normalized %>% unique %>% length
+authors %>% nrow
 ```
 
-## Citation Topics are Correlated to Source Types, Politician Parties, Ideology
+
+## DIME correlates to category
+
+```{r}
+feols(cfscore ~ category.slant, data = sources) %>%
+    etable() %>%
+    htmlTable()
+```
+
+### DIME coverage
+```{r}
+s <- sources %>% make_cfscore()
+n_covered.i <- s %>%
+    filter(!is.na(cfscore.org)) %>%
+    nrow()
+n_orgs.i <- s %>%
+    filter(!is.na(cfscore.org)) %>%
+    .$org_id %>%
+    unique() %>%
+    length()
+pct.i <- round(n_covered.i / nrow(s) * 100)
+
+s <- sources %>% make_cfscore(list(impute.off = T))
+n_covered <- s %>%
+    filter(!is.na(cfscore.org)) %>%
+    nrow()
+n_orgs <- s %>%
+    filter(!is.na(cfscore.org)) %>%
+    .$org_id %>%
+    unique() %>%
+    length()
+sprintf("We match %s organizations to DIME accounting for %s pct of sources. After imputation, we retrieve scores for %s orgs accounting for %s pct of sources.", 
+    n_orgs, 
+    n_covered * 100 / nrow(s), n_orgs.i, pct.i)
+```
+
+
+
+### Top Source DIME scores 
+
+```{r}
+dt <- sources %>%
+    make_cfscore(list(impute.all = T)) %>%
+    filter(!is.na(cfscore.org), !is.na(org_id)) %>%
+    group_by(org_id, organization_name, cfscore.org) %>%
+    summarize(
+        n = n()
+    ) %>%
+    arrange(desc(n)) %>%
+    head(50)
+dt %>% ggplot(aes(x = cfscore.org, size = sqrt(n), y = n, color = cfscore.org, label = organization_name)) +
+    theme_bw() +
+    scale_y_log10() +
+    scale_x_continuous(limits = c(-1.5, 1.2)) +
+    scale_color_gradient(low = "blue", high = "red") +
+    geom_vline(xintercept = 0, lty = "dashed") +
+    theme(panel.grid = element_blank(), axis.text.y = element_blank()) +
+    labs(x = "DIME Ideology", y = "") +
+    geom_text_repel(
+        direction = "y",
+        min.segment.length = 999
+    ) +
+    guides(size = "none", color = "none", fill = "none")
+ggsave(here("paper/figures/dime-scatter-100.png"), width = 10, height = 6)
+```
+
+### Top DIME over time
+
+```{r}
+dt7 <- dt %>%
+    arrange(desc(n)) %>%
+    head(7)
+sources %>%
+    filter(org_id %in% dt7$org_id) %>%
+    group_by(year, organization_name, org_id, cfscore) %>%
+    summarize(n = n()) %>%
+    ggplot(aes(
+        x = year, y = n, color = cfscore < 0, lty = organization_name
+    )) +
+    geom_smooth(se = F) +
+    theme_min
+```
+
+### Politicians 
+
+```{r}
+pres <- sources %>%
+    mutate(
+        pres = case_when(
+            str_detect(person_name, "Biden") ~ "Biden",
+            str_detect(person_name, "Obama") ~ "Obama",
+            str_detect(person_name, "Trump") ~ "Trump",
+            category.slant %in% c("Democrat", "Republican") ~ category.slant,
+            TRUE ~ NA
+        )
+    )
+npy <- sources %>%
+    group_by(year) %>%
+    summarize(npy = n())
+
+ggarrange(plotlist = list(
+    pres %>%
+        group_by(year, pres) %>%
+        filter(!is.na(pres)) %>%
+        summarize(n = n()) %>%
+        ggplot(aes(x = year, y = n, color = pres)) +
+        geom_line() +
+        theme_min,
+    # Normalize by # of sources per year...
+    pres %>%
+        group_by(year, pres) %>%
+        filter(!is.na(pres)) %>%
+        summarize(n = n()) %>%
+        left_join(npy) %>%
+        ggplot(aes(x = year, y = n / npy, color = pres, shape = pres)) +
+        geom_line() +
+        geom_point() +
+        scale_x_continuous(breaks = seq(2012, 2022, 4)) +
+        theme_min
+), common.legend = T, legend = "bottom")
+```
+
+## Journalists
+
+### Demographics
+```{r}
+ggarrange(plotlist = list(
+    authors %>% ggplot(aes(x = age_est_2017)) +
+        geom_histogram(),
+    authors %>% ggplot(aes(x = elite_undergrad_ivyplus)) +
+        geom_bar(stat = "count"),
+    authors %>% ggplot(aes(x = edu.has_postgrad)) +
+        geom_bar(stat = "count"),
+    authors %>% ggplot(aes(x = field.journo)) +
+        geom_bar(stat = "count"),
+    authors %>% ggplot(aes(x = gender)) +
+        geom_bar(stat = "count"),
+    authors %>% ggplot(aes(x = race.nonwhite)) +
+        geom_bar(stat = "count")
+))
+```
+
+### Demographics over time
+
+Unit of analysis: unique journalists per year
+
+```{r warning=F, message=F}
+journo.years <- articles %>%
+    group_by(author_name, year, elite_undergrad_ivyplus, edu.undergrad, edu.has_postgrad, is_career, field.journo, age_est, gender, race.nonwhite) %>%
+    summarize(n = n()) %>%
+    filter(!is.na(author_name))
+age.plt <- journo.years %>%
+    ggplot(aes(x = year, y = as.numeric(age_est > 37))) +
+    geom_smooth(method = "loess") +
+    labs(x = "Year", y = "Age > 37")
+ivy.plt <- journo.years %>%
+    ggplot(aes(x = year, y = as.numeric(elite_undergrad_ivyplus))) +
+    geom_smooth(method = "loess") +
+    labs(y = "Ivy League", x = "Year")
+fj.plt <- journo.years %>%
+    ggplot(aes(x = year, y = as.numeric(field.journo))) +
+    labs(y = "Journalism Degree", x = "Year") +
+    geom_smooth(method = "loess")
+
+pg.plt <- journo.years %>%
+    ggplot(aes(x = year, y = as.numeric(edu.has_postgrad))) +
+    labs(y = "Postgraduate Degree", x = "Year") +
+    geom_smooth(method = "loess")
+gender.plt <- journo.years %>%
+    ggplot(aes(x = year, y = as.numeric(gender == "female"))) +
+    labs(y = "Female", x = "Year") +
+    geom_smooth(method = "loess")
+race.plt <- journo.years %>%
+    ggplot(aes(x = year, y = as.numeric(race.nonwhite))) +
+    labs(y = "Nonwhite", x = "Year") +
+    geom_smooth(method = "loess")
+plts <- list(age.plt, ivy.plt, fj.plt, gender.plt, pg.plt, race.plt) %>%
+    lapply(function(p) {
+        p +
+            theme_bw() +
+            theme(panel.grid = element_blank()) +
+            scale_x_continuous(breaks = seq(2012, 2022, 2))
+    })
+ggarrange(plotlist = plts)
+ggsave(here("paper/figures/journo-agg-2.png"), width = 10, height = 6)
+```
+
+# Ideological Sources
+
+
+```{r}
+sources %>%
+    group_by(year, category.slant) %>%
+    summarize(n = n()) %>%
+    ggplot(aes(x = year, y = n, color = category.slant, lty = category.slant)) +
+    geom_smooth(se = F) +
+    theme_min
+
+sources_per_year <- sources %>%
+    group_by(year) %>%
+    summarize(year.n = n())
+sources %>%
+    group_by(year, category.slant) %>%
+    summarize(n = n()) %>%
+    left_join(sources_per_year) %>%
+    ggplot(aes(x = year, y = n / year.n, color = category.slant, lty = category.slant)) +
+    geom_line() +
+    theme_min
+```
+
+# Coverage/data quality
+
+## Articles with DIME and journalist information
+
+```{r}
+articles.b <- sources %>% calculate_balance(types = c("org_category", "cfscore"))
+articles.with.author <- articles.b %>% filter(!is.na(author))
+articles.with.author.cfscore <- articles.with.author %>% filter(!is.na(cfscore))
+nrow(articles.with.author)
+nrow(articles.with.author.cfscore)
+```
+
+## DIME coverage
+
+```{r}
+nrow(sources %>% filter(!is.na(cfscore))) / nrow(sources)
+
+nrow(sources %>% filter(!is.na(cfscore.impute))) / nrow(sources)
+
+table(
+    !is.na(sources$cfscore),
+    sources$category.slant
+)
+
+n_eligible <- sources %>%
+    filter(tolower(category.slant) %in% c("advocacy", "environmental", "fossil fuel", "business", "democrat", "republican")) %>%
+    nrow()
+# Excludes bureaucrat, media, other
+nrow(sources %>% filter(!is.na(cfscore))) / n_eligible
+nrow(sources %>% filter(!is.na(cfscore.impute))) / n_eligible
+```
+
+
+# Citation Topics are Correlated to Source Types, Politician Parties, Ideology
 
 ```{r}
 list(
@@ -1332,89 +479,27 @@ list(
 etable(feols(cfscore ~ src_topic, data = sources))
 ```
 
-```{r comment=NA}
-#sources$src_topic <- relevel(as.factor(sources$comment.topic), ref = "Other")
-#etable(feols(cfscore ~ src_topic, data = sources), tex = TRUE, digits = 2)
-```
 
-## Non policy articles cite fewer ideological sources
+# Non policy articles cite fewer ideological sources
 
 ```{r, results='asis'}
 all.sources$cfscore_std <- all.sources$cfscore - mean(all.sources$cfscore, na.rm = T)
+all.sources.balance <- all.sources %>% calculate_balance(types = c("cfscore", "org_category"))
 models <-
     list(
-        lm(n_env + n_ff ~ policy_label_gpt, data = all.articles),
-        lm(n_rep + n_dem ~ policy_label_gpt, data = all.articles)
+        feols(n_left ~ policy_label_gpt, data = all.sources.balance),
+        feols(n_right ~ policy_label_gpt, data = all.sources.balance)
     )
-stargazer(models, type = "html")
+etable(models) %>% htmlTable()
 ```
 
-```{r comment=NA}
-stargazer(models)
-```
-
-## Alternate Specifications
-
+# NYT comment counts
 ```{r}
-models <- make_models(all.articles, c("ideo.mean.i", "balance_all"), j_covars)
-models2 <- make_models(articles, c("ideo.mean", "-prop_topic_environment"), j_covars)
-etable(models2)
-etable(c(models, models2))
-did <- make_did(all.articles)
-pdf(here("paper/figures/did-event-study-alt.pdf"))
-did$event_study_model %>%
-    coefplot(main = "", xlab = "")
-dev.off()
-```
-```{r comment=NA}
-etable(c(models, models2), tex = T, digits = 2)
-```
-
-## Investigating Drivers
-
-```{r}
-models3 <- make_models(articles, c(
-    "ideo.mean.pols",
-    "ideo.mean.i.orgs",
-    "n_ff",
-    "n_env",
-    "n_rep",
-    "n_dem",
-    "n_right_dime",
-    "-n_left_dime",
-    "(n_ff > 0)",
-    "(n_env > 0)",
-    "(n_rep > 0)",
-    "(n_dem > 0)",
-    "prop_ff",
-    "prop_env",
-    "prop_rep",
-    "prop_dem"
-), j_covars)
-etable(models3)
-```
-```{r comment=NA}
-etable(models3, tex = T)
-```
-
-## Elite Educated Slant Over Time
-
-```{r}
-articles %>%
-    ggplot(aes(x = date, y = ideo.mean.i, color = elite_undergrad_ivyplus, group = elite_undergrad_ivyplus)) +
-    geom_smooth(se = F, method = "loess") +
-    theme_bw() +
-    theme(panel.grid.minor = element_blank()) +
-    labs(title = "Ideology of sources over time by elite education")
-```
-
-## NYT comment counts
-```{r}
-nyt.articles <- articles %>% filter(source == "New York Times")
-nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = ideo.mean.i)) +
+nyt.articles <- articles.b %>% filter(source == "New York Times")
+nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = cfscore)) +
     geom_point(alpha = 0.3, size = 10) +
     scale_color_gradient(low = "blue", high = "red")
-nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = balance_all)) +
+nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = balance)) +
     geom_point()
 ```
 
@@ -1425,57 +510,53 @@ table(nyt.articles$n_comments %>% is.na())
 ```
 
 ```{r}
-nyt.articles %>% ggplot(aes(x = ideo.mean.i, y = n_comments)) +
+nyt.articles %>% ggplot(aes(x = cfscore, y = n_comments)) +
     geom_point() +
     geom_smooth() +
     theme_bw()
 ggsave(here("paper/figures/nyt-comments-slant-scatter.png"), width = 6, height = 5)
-summary(feols(n_comments ~ ideo.mean.i, data = nyt.articles))
+summary(feols(n_comments ~ cfscore, data = nyt.articles))
 ```
 
 ```{r}
 m <- feols(n_comments ~ elite_undergrad_ivyplus + age_est_2017 + race.nonwhite + gender + field.journo + edu.has_postgrad, data = nyt.articles)
-etable(m, tex = T)
+etable(m) %>% htmlTable()
 ```
 
-```{r comment=NA}
-```
 
-# What articles get more comments?
-summary(feols(n_comments ~ n + n_unique_source_category | year, data = nyt.articles))
-summary(feols(log(n_comments) ~ n + n_unique_source_category | year, data = nyt.articles))
-
+## What articles get more comments?
+```{r}
 # Journalist characteristics = journalist background is sort of significant I guess?
 summary(feols(log(n_comments) ~ elite_undergrad_ivyplus + age_est_2017 + race.nonwhite + gender + field.journo + edu.has_postgrad, data = nyt.articles))
 
 # More comments for more rightward leaning articles.. that's basically it
 # Not sure exactly how to interpret this...
-summary(feols(n_comments ~ balance_all, data = nyt.articles))
-summary(feols(n_comments ~ ideo.mean.i + balance_all, data = nyt.articles))
-summary(feols(log(n_comments) ~ ideo.mean.i + balance_all, data = nyt.articles))
+summary(feols(n_comments ~ balance, data = nyt.articles))
+summary(feols(n_comments ~ cfscore + balance, data = nyt.articles))
+summary(feols(log(n_comments) ~ cfscore + balance, data = nyt.articles))
 
 # Interesting...
-summary(feols(n_comments ~ ideo.mean.i + balance_all + n + n_unique_source_category, data = nyt.articles))
-summary(feols(log(n_comments) ~ ideo.mean.i + balance_all + n + n_unique_source_category, data = nyt.articles))
-summary(feols(n_comments ~ ideo.mean.i + balance_all + post2017, data = nyt.articles))
+summary(feols(n_comments ~ cfscore + balance + n, data = nyt.articles))
+summary(feols(log(n_comments) ~ cfscore + balance + n, data = nyt.articles))
+summary(feols(n_comments ~ cfscore + balance + post2016, data = nyt.articles))
 
 # no super intersting interaction with the post
-summary(feols(n_comments ~ (ideo.mean.i > 0) * post2017, data = nyt.articles))
-summary(feols(log(n_comments) ~ (ideo.mean.i > 0) * post2017, data = nyt.articles))
+summary(feols(n_comments ~ (cfscore > 0) * post2016, data = nyt.articles))
+summary(feols(log(n_comments) ~ (cfscore > 0) * post2016, data = nyt.articles))
 
-nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = balance_all)) +
+nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = balance)) +
     geom_smooth(se = F, method = "lm") +
     geom_point()
-nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = ideo.mean.i > 0)) +
+nyt.articles %>% ggplot(aes(x = date, y = n_comments, color = cfscore > 0)) +
     geom_smooth(se = F, method = "lm") +
     geom_point()
 
 etable(
     list(
         feols(n_comments ~ elite_undergrad_ivyplus + age_est_2017 + race.nonwhite + gender + field.journo + edu.has_postgrad, data = nyt.articles),
-        # feols(n_comments ~ elite_undergrad_ivyplus + age_est_2017 + race.nonwhite + gender + field.journo + edu.has_postgrad | year, data = nyt.articles),
-        feols(n_comments ~ ideo.mean.i + balance_all + n + n_unique_source_category, data = nyt.articles)
-        # feols(n_comments ~ ideo.mean.i + balance_all + n + n_unique_source_category | year, data = nyt.articles)
+        feols(n_comments ~ cfscore + balance + n, data = nyt.articles)
     )
 )
 ```
+
+# END
