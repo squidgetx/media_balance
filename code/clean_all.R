@@ -1,3 +1,6 @@
+# Do all final pre-analysis cleaning and joining
+# Writes data to the masterdata folder
+
 source(here::here("code/setup.R"))
 library(rlang)
 datadir <- "data/masterdata"

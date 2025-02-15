@@ -1,13 +1,13 @@
-default: balance.html journalists.html
+default: balance.html journalists.html analysis.html 
 
-balance.html: balance.Rmd data/sources.tsv load.R
+balance.html: balance.Rmd deps
 	Rscript -e "rmarkdown::render('balance.Rmd')"
 
-journalists.html: journalists.Rmd data/sources.tsv load.R
+journalists.html: journalists.Rmd deps 
 	Rscript -e "rmarkdown::render('journalists.Rmd')"
 
-analysis.html: analysis.Rmd data/sources.tsv
+analysis.html: analysis.Rmd deps
 	Rscript -e "rmarkdown::render('analysis.Rmd')"
 
-data/sources.tsv: prep_analysis.R ../sources/sources.tsv
-	Rscript prep_analysis.R
+deps: load.R ../../data/masterdata/sources.tsv
+

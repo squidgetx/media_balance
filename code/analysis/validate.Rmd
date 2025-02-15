@@ -1,0 +1,28 @@
+---
+---
+
+# Validation
+
+```{r include=F}
+source(here::here("code/analysis/load.R"))
+```
+
+## DIME Imputation
+
+```{r}
+cfs <- sources %>% filter(cfscore_src != "politician", !is.na(cfscore))
+
+# All organizations that we matched to DIME
+cf.test <- cfs %>%
+    filter(!is.na(cfscore.raw)) %>%
+    group_by(org_id, organization_name, cfscore.raw, cfscore.i2, cfscoresd) %>%
+    summarize(n = n())
+cf.test
+cor(cf.test$cfscore.raw, cf.test$cfscore.i2, use='complete')
+# correlation is OK
+
+for(sdthresh in seq(0.1, 1, 0.1)) {
+    df <- cf.test %>% filter(cfscoresd < sdthresh)
+    cor(df$cfscore.raw, df$cfscore.i2, use='complete') %>% print
+}
+```

@@ -19,15 +19,16 @@ A within-journalist analysis shows that a large portion of the change in balance
 
 ## Code
 
+`clean_all.R` collects source, article, and author data from other places in the project, does some final cleaning and variable construction, and outputs the main analysis files into `masterdata`
+
 ### Analysis
 
 The `analysis` directory contains all of the code related to the final analysis of the data
 
-- Run `make` to knit all relevant files
+- Run `make` to knit all files, or you can just knit the Rmds directly.
 - `analysis.Rmd` contains main descriptives and some exploratory analysis
 - `balance.Rmd` contains the main results about the trend of balance over time
 - `journalists.Rmd` contains the main results about journalist characteristics and balance as the dependent variable
-- `prep_analysis.R` collects source, article, and author data from other places in the project, does some final cleaning and variable construction, and outputs the main analysis files into `masterdata`
 - `load.R` is an R snippet that loads the main data files and contains functions used to construct the balance and ideology scores in the main analysis
 
 ### Sources
@@ -36,7 +37,7 @@ The `sources` directory contains all code related to extracting sources from the
 
 - `0-extract/` contains code related to extracting the sources from the articles
 - `1-dedup/` contains code related to deduplicating organization names using hierarchical clustering
-- `2-supplement/` contains code related to categorizing organizations using GPT
+- `2-supplement/` contains code related to categorizing organizations using GPT. There is a current known bug wher this step's build needs to run make twice. The first time it will error.
 - `3-dime/` contains code related to matching organization names  and politicians to DIME
 - `4-comments/` contains code related to classifying the topic of the source citation using GPT
 - `5-impute/` contains code related to imputing DIME scores using GPT
@@ -46,9 +47,10 @@ Each subdirectory contains a `makefile` that performs the main task of the data 
 
 ### Articles
 
-The `articles` directory contains code related to cleaning, categorizing, and analyzing article metadata based on the raw metadata dump from Proquest. You can run the entire article data pipeline using `make`.
+The `articles` directory contains code related to cleaning, categorizing, and analyzing article metadata based on the raw metadata dump from Proquest. You can run the entire article data pipeline using `make`. The cleaned articles are output into `articles.clean.tsv`
 
-The cleaned articles are output into `articles.clean.comments.tsv`
+Currently, the articles pipeline is **broken**, so running `make` will not really do anything. `articles.clean.tsv` is provided.
+
 
 - The `count-citations` subdirectory contains simple analysis code describing what proportion of article text is a 3rd party quote. (This should maybe be moved to `analysis` folder)
 - The `nyt_details` subdirectory contains code used to scrape the number of comments on NYT articles. 
@@ -81,4 +83,4 @@ This folder contains code related to setting up a Potato annotation server for c
 - R
 - Python
     - You can install all Python related dependencies using `pip install -r requirements.txt` from the `code` directory
-- You need an OpenAI key to use the GPT API. However, for convenience the cached results are stored in `progress.jsonl` files throughout this replication archive.
+- You need an OpenAI key to use the GPT API. However, for convenience the cached results are stored in `progress.jsonl` files throughout this replication archive. Re-building the replication archive (eg, using `make`) will by default use these cached files.
