@@ -84,3 +84,7 @@ This folder contains code related to setting up a Potato annotation server for c
 - Python
     - You can install all Python related dependencies using `pip install -r requirements.txt` from the `code` directory
 - You need an OpenAI key to use the GPT API. However, for convenience the cached results are stored in `progress.jsonl` files throughout this replication archive. Re-building the replication archive (eg, using `make`) will by default use these cached files.
+
+## Other Notes
+
+Unfortunately, the manual validation data and analysis are kind of strewn messily about and not currently located in one place.
