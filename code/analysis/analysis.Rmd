@@ -493,6 +493,8 @@ models <-
 etable(models) %>% htmlTable()
 ```
 
+# Appendix/Supplementary
+
 # NYT comment counts
 ```{r}
 nyt.articles <- articles.b %>% filter(source == "New York Times")
@@ -559,4 +561,3 @@ etable(
 )
 ```
 
-# END

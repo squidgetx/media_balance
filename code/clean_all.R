@@ -23,9 +23,13 @@ articles.authors <- articles %>%
     mutate(
         ## Article level data
         year = year(date),
-        post2016 = year > 2016,
-
         year.q = quarter(date, with_year = T),
+        post2016 = year > 2016,
+        admin = case_when(
+            year < 2016 ~ 'Obama',
+            year < 2020 ~ 'Trump',
+            TRUE ~ 'Biden'
+        )),
         newspaper_lean = case_when(
             str_detect(source, "Wall St") ~ "RIGHT",
             str_detect(source, "New York") ~ "LEFT",

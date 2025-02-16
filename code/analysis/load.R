@@ -7,7 +7,7 @@ datadir <- "data/masterdata"
 all.articles <- read_tsv(here(datadir, "articles.tsv"))
 all.sources <- read_tsv(here(datadir, "sources.tsv"))
 sources <- all.sources %>% filter(policy_label_gpt)
-articles <- all.articles %>% filter(policy_label_gpt)
+articles <- all.articles %>% filter(policy_label_gpt) 
 authors <- articles %>%
     group_by(author_name, elite_undergrad_ivyplus, edu.undergrad, edu.has_postgrad, is_career, field.journo, age_est_2017, gender, race.nonwhite) %>%
     summarize(n = n()) %>%
@@ -24,7 +24,7 @@ sources.repna <- sources %>% mutate(
 
 make_cfscore <- function(
     df,
-    cfscore.options = list(pols = F, impute.all = F, impute.off = F, nwd.sd.thresh = 0.8)) {
+    cfscore.options = list(pols = F, impute.all = F, impute.off = F, nwd.sd.thresh = 0.5)) {
     df %>% mutate(
         # Raw org cfscore is the raw match value if
         # 1. the category is in a list of approved categories
@@ -67,7 +67,7 @@ make_cfscore <- function(
 calculate_balance <- function(
     df,
     types = c("party", "org_category", "cfscore", "topic"),
-    cfscore.options = list(pols = F, impute.all = F, impute.off = F, nwd.sd.thresh = NA),
+    cfscore.options = list(pols = F, impute.all = F, impute.off = F, nwd.sd.thresh = 0.5),
     ff_only = T,
     thresh = 0.2,
     articles_df = articles.repna) {
@@ -124,6 +124,10 @@ calculate_balance <- function(
         left_join(articles_df)
 }
 
+balance_rate <- function(df) {
+    df %>% summarize(balance=sum(balance, na.rm=T)/sum(!is.na(balance)))
+}
+
 j_covars <- function(age = 37) {
     c(
         "elite_undergrad_ivyplus",
@@ -133,6 +137,11 @@ j_covars <- function(age = 37) {
         "gender",
         "race.nonwhite"
     )
+}
+
+etable2 <- function(models, filename, digits=2) {
+    etable(models, tex=T, digits=digits) %>% writeLines(filename)
+    etable(models, digits=digits) %>% htmlTable
 }
 
 make_fmla <- function(y, covariates = j_covars(), festring = "| year + source") {

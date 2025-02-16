@@ -1,5 +1,6 @@
 ---
 title: "Journalists"
+author: "Sylvan Zheng"
 output:
     html_document:
         toc: true
@@ -13,26 +14,36 @@ df <- sources %>%
     )
 ```
 
-# Journalists are Independent of Outlets
+# Journalists and Balance
+
+- What is driving trends/variation in balance news production?
+- Our argument: changing norms in newsroom as a reaction to Trump
+    - This could be editors/newsrooms becoming more accepting or even preferring unbalanced articles
+    - But there could also be journalist level heterogeneity (Boxell and Conway, 2022)
+
+# Journalists vs Outlets
+
+- Journalists explain variation in balance better than outlets
+
+## Comparing R2 
+
+- Look at journalists who write more than 2 articles
+- Outlet fixed effect explains almost no variation in balance (R2 = 0)
+- R2 using journalist fixed effect way higher than outlet level fixed effect (R2 = 0.17)
 
 ```{r}
-# Select articles written by journalists with at least 2 articles
 df.j <- df %>%
     left_join(authors %>% select(author_name, n) %>% rename(n_articles = n)) %>%
     filter(n_articles > 2, !is.na(author_name))
-df.j$author_name %>%
-    unique() %>%
-    length()
-# 708 unique authors
 etable(
     feols(balance ~ source, data = df.j),
-    feols(balance ~ 1 | author_name, data = df.j),
-    feols(balance ~ source | author_name, data = df.j)
+    feols(balance ~ 1 | author_name, data = df.j)
 ) %>% htmlTable()
 ```
 
-
 ## SD of balance lower in journalists than outlets
+
+- Another way to show this is that the SD of journalist balance is smaller than outlet level balance
 
 ```{r}
 osds <- df.j %>%
@@ -53,36 +64,134 @@ sds$balance_sd %>% mean(na.rm = T)
 ```
 
 ## Movers Only
+
+- We can leverage the (small) number of journalist who move between newspapers in our sample
+- With journalist fixed effect, look at variation associated with different outlets. Mostly null.
+- Admittedly, there is an effect for USA Today, TODO to figure out what is going on there
+
 ```{r}
 df.m <- df.j %>%
     group_by(author_name) %>%
     mutate(n_newspapers = length(unique(source))) %>%
     filter(n_newspapers > 1)
-# 98 authors but ok
 df.m$author_name %>%
     unique() %>%
     length()
-etable(
-    feols(balance ~ source, data = df.m),
-    feols(balance ~ 1 | author_name, data = df.m),
-    feols(balance ~ source | author_name, data = df.m)
-) %>% htmlTable()
+etable2(list(
+    feols(balance ~ source | author_name, data = df.m),
+    feols(balance ~ source | author_name + year, data = df.m)
+), here("paper/tables/switchers.tex"))
 ```
 
-```{r include=F}
-etable(
-    feols(balance ~ source, data = df.j),
-    feols(balance ~ 1 | author_name, data = df.j),
-    feols(balance ~ source | author_name, data = df.j),
-    tex=T
-) %>% writeLines(here('paper/tables/switchers.tex'))
+# Within Journalist Analysis
+
+```{r}
+df.an <- df %>%
+    filter(year > 2016) %>%
+    group_by(author_name) %>%
+    summarize(balance_rate = sum(balance, na.rm = T) / sum(!is.na(balance))) %>%
+    filter(!is.na(balance_rate))
+df.a <- df %>%
+    left_join(df.an) %>%
+    mutate(
+        treat = balance_rate < 0.3,
+    )
+# Raw trends
+df.a %>%
+    filter(!is.na(treat)) %>%
+    ggplot(aes(x = date, y = as.numeric(balance), color = treat)) +
+    geom_vline(xintercept = as.Date("2016-01-01"), lty = 2) +
+    geom_smooth(method = "loess") +
+    labs(color = "Post 2016 Balance Rate < 0.3", x = "Date", y = "Balance") +
+    theme_min
+ggsave(here("paper/figures/did-raw-trends.png"), width = 6, height = 4)
+
+df.a %>%
+    filter(!is.na(treat)) %>%
+    ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(round(balance_rate, digits = 1)))) +
+    geom_vline(xintercept = as.Date("2016-01-01"), lty = 2) +
+    geom_smooth(method = "loess", se = F) +
+    labs(color = "Post 2016 Balance Rate", x = "Date", y = "Balance") +
+    theme_min
+
+make_did_model <- function(df, thresh = 0.3) {
+    df.an <- df %>%
+        filter(year > 2016) %>%
+        group_by(author_name) %>%
+        summarize(balance_rate = sum(balance, na.rm = T) / sum(!is.na(balance))) %>%
+        filter(!is.na(balance_rate))
+    df.a <- df %>%
+        left_join(df.an) %>%
+        mutate(
+            treat = balance_rate < thresh
+        )
+    feols(balance ~ i(year, treat, ref = 2016) | year + author_name, df.a)
+}
+models <- lapply(seq(0.2, 0.5, 0.1), \(t) make_did_model(df, t))
+ggiplot(models[[2]])
+ggsave(here("paper/figures/did-event-study.png"), width = 6, height = 4)
+etable2(models[[2]], here("paper/tables/did.tex"))
 ```
 
-## Takeaways
+## Robust to different thresholds
+```{r}
+ggiplot(models)
+ggsave(here("paper/figures/did-event-study-robust.png"), width = 6, height = 4)
+```
 
-- Within journalist characteristics matter more than outlet for determining balance, with the exception of USA Today weirdly enough
+## Demographics of the treated group
 
-# Journalist Demographics Correlate with Balance
+This aligns with our cross sectional analysis
+
+```{r}
+etable2(
+    list(
+        feols(make_fmla("treat"), data = df.a),
+        feols(make_fmla("balance_rate"), data = df.a)
+    ),
+    here("paper/tables/treat-demo.tex")
+)
+```
+
+# Is there replacement happening? 
+
+- Maybe new journalists coming in are different than old journalists
+- New journalists write less balanced articles?
+- Analysis suggests this is happening a little bit, but not super clear in the data
+
+## Age analysis
+
+```{r}
+yvars <- c("n", "balance", "cfscore.sd", "cfscore.median")
+models <- c(
+    make_models(df, yvars, covariates = c("age_est"))
+)
+etable2(models, here("paper/tables/age-balance.tex"))
+```
+
+## Cohort Analysis
+
+- For each journalist, identify their first year in the data 
+
+```{r}
+cohort <- df %>%
+    group_by(author_name) %>%
+    summarize(
+        cohort = year(min(as.Date(date), na.rm = T))
+    )
+cohort$cohort %>% table(useNA = "ifany")
+df.c <- df %>% left_join(cohort)
+etable2(list(
+    feols(balance ~ cohort, data = df.c),
+    feols(balance ~ cohort > 2016, data = df.c)
+), here("paper/tables/cohort.tex"))
+ggcoefplot(feols(balance ~ as.factor(cohort), data = df.c))
+ggsave(here("paper/figures/cohort-plot.png"), width = 6, height = 4)
+```
+
+# Appendix/Supplementary Analysis
+
+## Cross Section shows demographics are related to balance
 
 ```{r}
 df.rn <- sources %>%
@@ -90,18 +199,13 @@ df.rn <- sources %>%
         types = c("org_category", "cfscore"),
         articles_df = articles
     )
-yvars <- c("n", "balance", "cfscore.sd", "cfscore.median")
-models <- c(
-    make_models(df.rn, yvars)
-)
-etable(models, fitstat = c("n")) %>% htmlTable()
 ```
 
 ```{r include=F}
-etable(models, fitstat = c("n"), tex=T) %>% writeLines(here('paper/tables/main-journalist-demo.tex'))
+etable(models, fitstat = c("n"), tex = T) %>% writeLines(here("paper/tables/main-journalist-demo.tex"))
 ```
 
-## Robust to varying specifications
+### Robust to varying specifications
 
 Plot coefficients for a set of different regression specifications:
 
@@ -122,10 +226,10 @@ cplots <- lapply(1:length(yvars), \(i) {
     ggcoefplot(ymods)
 })
 ggarrange(plotlist = cplots, common.legend = T, legend = "bottom")
-ggsave(here('paper/figures/coefplot-robust-1.png'), width=7, height=7)
+ggsave(here("paper/figures/coefplot-robust-1.png"), width = 7, height = 7)
 ```
 
-## Robust to varying cfscore thresholds
+### Robust to varying cfscore thresholds
 
 Plot balance effects for different thresholds of cfscore variation
 ```{r}
@@ -138,7 +242,7 @@ models <- lapply(seq(0.1, 0.5, 0.1), \(t) {
     make_models(df.t, c("balance"))
 })
 ggcoefplot(models)
-ggsave(here('paper/figures/coefplot-robust-2.png'), width=6, height=4)
+ggsave(here("paper/figures/coefplot-robust-2.png"), width = 6, height = 4)
 ```
 
 Plot effects for different thresholds of imputation strategy 
@@ -165,10 +269,10 @@ cplots <- lapply(1:3, \(i) {
     ggcoefplot(ymods)
 })
 ggarrange(plotlist = cplots, common.legend = T, legend = "bottom")
-ggsave(here('paper/figures/coefplot-robust-3.png'), width=7, height=7)
+ggsave(here("paper/figures/coefplot-robust-3.png"), width = 7, height = 7)
 ```
 
-## Robust to varying age specification
+### Robust to varying age specification
 
 ```{r}
 models <- seq(25, 50) %>% lapply(\(age) {
@@ -188,38 +292,8 @@ cplots <- lapply(1:4, \(i) {
         theme_min
 })
 ggarrange(plotlist = cplots, common.legend = T, legend = "bottom")
-ggsave(here('paper/figures/coefplot-robust-4.png'), width=7, height=7)
+ggsave(here("paper/figures/coefplot-robust-4.png"), width = 7, height = 7)
 ```
-
-# How much does demographic shift contribute to chanes in balance?
-
-## Cohort effect
-```{r}
-cohort <- df %>%
-    group_by(author_name) %>%
-    summarize(
-        cohort = year(min(as.Date(date), na.rm = T))
-    )
-cohort$cohort %>% table(useNA = "ifany")
-df.c <- df %>% left_join(cohort)
-# Linear specification
-feols(balance ~ cohort, data = df.c)
-feols(balance ~ cohort > 2016, data=df.c)
-# Fixed effect specification
-ggcoefplot(feols(balance ~ as.factor(cohort), data = df.c))
-
-ggsave(here('paper/figures/cohort-plot.png'), width=6, height=4)
-```
-
-```{r comment=NA} 
-etable(
-    feols(balance ~ as.factor(cohort), data=df.c), 
-    feols(balance ~ cohort > 2016, data=df.c), 
-tex=T) %>% writeLines(here('paper/tables/cohort.tex'))
-```
-
-- There doesn't seem to be a super strong cohort effect. 
-- Evidence against the replacement theory
 
 ## Demographic Differences over Time
 ```{r}
@@ -245,72 +319,6 @@ ggarrange(plotlist = list(
 ), nrow = 1, legend = "bottom")
 ```
 
-
-# Diff in Diff
-
-```{r}
-df.an <- df %>%
-    filter(year > 2016) %>%
-    group_by(author_name) %>%
-    summarize(balance_rate = sum(balance, na.rm = T) / sum(!is.na(balance))) %>%
-    filter(!is.na(balance_rate))
-df.a <- df %>%
-    left_join(df.an) %>%
-    mutate(
-        treat = balance_rate < 0.3,
-    )
-# Raw trends
-df.a %>%
-    filter(!is.na(treat)) %>%
-    ggplot(aes(x = date, y = as.numeric(balance), color = treat)) +
-    geom_vline(xintercept = as.Date("2016-01-01"), lty = 2) +
-    geom_smooth(method = "loess") +
-    theme_min
-ggsave(here('paper/figures/did-raw-trends.png'), width=6, height=4)
-
-df.a %>%
-    filter(!is.na(treat)) %>%
-    ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(round(balance_rate, digits = 1)))) +
-    geom_vline(xintercept = as.Date("2016-01-01"), lty = 2) +
-    geom_smooth(method = "loess", se = F) +
-    theme_min
-
-make_did_model <- function(df, thresh = 0.3) {
-    df.an <- df %>%
-        filter(year > 2016) %>%
-        group_by(author_name) %>%
-        summarize(balance_rate = sum(balance, na.rm = T) / sum(!is.na(balance))) %>%
-        filter(!is.na(balance_rate))
-    df.a <- df %>%
-        left_join(df.an) %>%
-        mutate(
-            treat = balance_rate < thresh
-        )
-    feols(balance ~ i(year, treat, ref = 2016) | year + author_name, df.a)
-}
-models <- lapply(seq(0.2, 0.5, 0.1), \(t) make_did_model(df, t))
-ggiplot(models[[2]])
-ggsave(here('paper/figures/did-event-study.png'), width=6, height=4)
-etable(models[[2]], tex=T) %>% writeLines(here('paper/tables/did.tex'))
-```
-
-
-## Robust to different thresholds
-```{r}
-ggiplot(models)
-ggsave(here('paper/figures/did-event-study-robust.png'), width=6, height=4)
-```
-
-## Demographics of the treated group
-
-This aligns with our cross sectional analysis
-
-```{r}
-etable(feols(make_fmla("treat"), data = df.a))
-etable(feols(make_fmla("treat"), data = df.a), tex=T) %>%
-    writeLines(here('paper/tables/treat-demo.tex'))
-```
-
 ## Demographic regression before and after 2016
 
 ```{r}
@@ -321,7 +329,7 @@ etable(
     feols(make_fmla("balance", interactions, festring = ""), data = df.p),
     feols(make_fmla("balance", interactions, festring = "| source"), data = df.p),
     feols(make_fmla("balance", interactions, festring = "| author_name"), data = df.p)
-)
+) %>% htmlTable()
 ```
 
 Interactions here do not necessarily show that much.
