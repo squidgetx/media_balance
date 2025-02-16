@@ -1,0 +1,153 @@
+# Validation
+
+```{r include=F}
+source(here::here("code/analysis/load.R"))
+```
+
+## Source Extraction
+
+```{r}
+hy_corrections <- read_csv(here("data/validation labels/annotator_errors_hy.csv"))
+df2 <- read_tsv(here("data/validation labels/annotation_output.250.v2.tsv")) %>%
+    unique() %>%
+    filter(
+        !is.na(cite.anno) | source_type == "new"
+    ) %>%
+    mutate(
+        cite.anno = ifelse(cite.anno == "Yes-Dup", "Yes", cite.anno),
+        detail.correction = case_when(
+            tolower(person_name.anno) != tolower(person_name.gpt) ~ "person_name",
+            tolower(person_title.anno) != tolower(person_title.gpt) ~ "person_title",
+            tolower(organization.anno) != tolower(organization.gpt) ~ "organization",
+            tolower(category.anno) != tolower(category.gpt) ~ "category",
+            TRUE ~ NA
+        ),
+        error = case_when(
+            source_type == "new" ~ "This source did not get extracted by GPT (Type II)",
+            cite.anno != "Yes" ~ "This source isn't cited in the text (Type I)",
+            !is.na(detail.correction) ~ paste("Error in", detail.correction),
+            TRUE ~ NA
+        )
+    ) %>%
+    left_join(hy_corrections) %>%
+    mutate(
+        hy_coding = `HY_coding_was_annotator_correct?`,
+        detail_error = str_detect(error, "Error in") & hy_coding == "1",
+        false_source = str_detect(error, stringr::fixed("Type I)")) & hy_coding == "1",
+        missing_source = str_detect(error, stringr::fixed("Type II)")) & hy_coding == "1",
+    )
+df2.q <- df2 %>% filter(coder_qual)
+
+det <- sum(df2.q$detail_error, na.rm = T)
+fps <- sum(df2.q$false_source, na.rm = T)
+fns <- sum(df2.q$missing_source, na.rm = T)
+
+est.fp <- Hmisc::binconf(fns, nrow(df2.q), alpha = 0.05, method = "all")[1, ]
+est.fn <- Hmisc::binconf(fps, nrow(df2.q), alpha = 0.05, method = "all")[1, ]
+est.det <- Hmisc::binconf(det, nrow(df2.q), alpha = 0.05, method = "all")[1, ]
+err.df <- rbind(est.fp, est.fn, est.det) %>%
+    as.data.frame() %>%
+    mutate(name = c("Type I", "Type II", "Name/Title/Organization"))
+err.df %>%
+    ggplot(aes(x = name, y = PointEst, ymin = Lower, ymax = Upper)) +
+    geom_point() +
+    geom_errorbar(width = 0) +
+    theme_bw() +
+    labs(
+        title = "Error rates of GPT source extraction",
+        ## subtitle = "95% Confidence Intervals constructed with Bernoulli random variable model",
+        y = "Value",
+        x = "",
+    ) +
+    theme(
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+    ) +
+    scale_y_continuous(limits = c(0, NA), labels = scales::percent)
+ggsave(here("paper/figures/validation-result.png"), width = 4.5, height = 4.5)
+```
+## Category Labels
+
+```{r}
+## Random sample of 200 sources.
+## How many category labels are correct?
+labels <- read_csv(here("data/validation labels/category-validation-labels.csv"))
+labels$label %>%
+    table() %>%
+    prop.table()
+## 88% accuracy.
+
+## TODO: we have more updated labels somewhere else
+```
+
+#### Category Slant Labels
+
+```{r}
+## Random sample of 200 sources.
+## How many category labels are correct?
+labels <- read_csv(here("data/validation labels/category-slant-validation-labels.csv"))
+labels$label %>%
+    table() %>%
+    prop.table()
+```
+
+###### FF vs Env
+
+```{r}
+## TODO: we have more updated labels somewhere else
+df <- read_tsv(here("code/sources/2-supplement/sources.supplement.tsv")) %>% mutate(organization=tolower(organization_raw))
+labels <- read_tsv(here("data/validation labels/validation-env-ff-combined.tsv")) %>% 
+    left_join(df, by = c('organization')) %>% 
+    mutate(
+        env_category = case_when(
+            is.na(filename) ~ NA,
+            is.na(env_category) ~ 'other',
+            TRUE ~ env_category
+        )
+    ) %>% distinct(organization, human.label, env_category)
+table(labels$human.label == labels$env_category) %>% prop.table
+```
+
+## DIME
+
+```{r}
+cfs <- sources %>% filter(cfscore_src != "politician", !is.na(cfscore))
+```
+
+#### Imputation
+
+```{r}
+
+## All organizations that we matched to DIME
+cf.test <- cfs %>%
+    filter(!is.na(cfscore.raw)) %>%
+    group_by(org_id, organization_name, cfscore.raw, cfscore.i2, cfscoresd) %>%
+    summarize(n = n())
+
+## Get correlations for different sd thresholds
+for (sdthresh in seq(0.1, 1, 0.1)) {
+    df <- cf.test %>% filter(cfscoresd < sdthresh)
+    cor(df$cfscore.raw, df$cfscore.i2, use = "complete") %>% print()
+}
+
+## Scatter plot
+cf.test %>% filter(cfscoresd < 0.8) %>% ggplot(aes(x = cfscore.raw, y = cfscore.i2, size = n)) +
+    geom_point(alpha=0.8) + 
+    theme_min
+ggsave(here('paper/figures/dime-imputation-scatter.png'), width=6, height=5)
+```
+
+#### Comparison to categories
+
+```{r}
+s <- sources %>% filter(category.slant %in% c('Environmental', 'Fossil Fuel', 'Advocacy', 'Business'))
+models <- list(
+    feols(cfscore.impute ~ category.slant, data=s),
+    feols(cfscore.raw ~ category.slant, data=s),
+    feols(cfscore.i2 ~ category.slant, data=s)
+)
+etable(models)
+etable(models) %>% htmlTable
+etable(models, tex=T) %>% writeLines(here('paper/tables/cfscore-category.tex'))
+```
+

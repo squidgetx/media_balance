@@ -25,10 +25,8 @@ A within-journalist analysis shows that a large portion of the change in balance
 
 The `analysis` directory contains all of the code related to the final analysis of the data
 
-- Run `make` to knit all files, or you can just knit the Rmds directly.
-- `analysis.Rmd` contains main descriptives and some exploratory analysis
-- `balance.Rmd` contains the main results about the trend of balance over time
-- `journalists.Rmd` contains the main results about journalist characteristics and balance as the dependent variable
+- Run `make` to knit the bookdown file, or you can just knit it Rmds directly with `bookdown::render_book()`.
+- The output will be in `_book/index.html`. Open this in your web browser to view all the code and results 
 - `load.R` is an R snippet that loads the main data files and contains functions used to construct the balance and ideology scores in the main analysis
 
 ### Sources
@@ -80,7 +78,7 @@ This folder contains code related to setting up a Potato annotation server for c
 
 ## Dependencies
 
-- R
+- R, `bookdown` and `pacman`
 - Python
     - You can install all Python related dependencies using `pip install -r requirements.txt` from the `code` directory
 - You need an OpenAI key to use the GPT API. However, for convenience the cached results are stored in `progress.jsonl` files throughout this replication archive. Re-building the replication archive (eg, using `make`) will by default use these cached files.

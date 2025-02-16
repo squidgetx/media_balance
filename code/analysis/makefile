@@ -1,13 +1,7 @@
-default: balance.html journalists.html analysis.html 
+default: _book/index.html
 
-balance.html: balance.Rmd deps
-	Rscript -e "rmarkdown::render('balance.Rmd')"
-
-journalists.html: journalists.Rmd deps 
-	Rscript -e "rmarkdown::render('journalists.Rmd')"
-
-analysis.html: analysis.Rmd deps
-	Rscript -e "rmarkdown::render('analysis.Rmd')"
+_book/index.html: deps 01-descriptives.Rmd 02-balance.Rmd 03-journalists.Rmd 04-validate.Rmd
+	Rscript -e "bookdown::render_book('index.Rmd')"
 
 deps: load.R ../../data/masterdata/sources.tsv
 

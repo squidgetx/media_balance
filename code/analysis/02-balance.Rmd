@@ -1,0 +1,361 @@
+# Measuring Balance
+
+```{r include=F}
+source(here::here("code/analysis/load.R"))
+main <- sources %>%
+    calculate_balance(
+        types = c("org_category", "cfscore"),
+    )
+main.i2 <- sources %>%
+    calculate_balance(
+        types = c("org_category", "cfscore"),
+        cfscore.options = list(impute.all=T)
+    )
+knitr::opts_chunk$set(fig.height = 4)
+```
+
+This document contains analysis related to the measure of balance/bothsides journalism.
+
+- Many different possible interpretations, but we focus on the idea of "both sides" journalism/"equal coverage"
+- We define balance as an **article level indicator** that captures whether an article contains a quote from **both** a liberal and conservative source 
+    - We assume that the source of the quote is a good proxy for its content
+- "Left leaning" source: `environmental_advocacy` classification OR `cfscore < -0.3`
+    - NRDC, Environmental Defense Fund, Sierra Club
+- "Right leaning" source: `fossil_fuel_interest` classification OR `cfscore > 0.3`
+    - American Petroleum Institute, Exxon Mobile, US Chamber of Commerce
+- Balance Dummy: article includes both a "right" and "left" source
+    - `r round(sum(main$balance, na.rm=T) * 100/nrow(main))`% of articles are "balanced" by this definition
+
+## Alternative Measures of Balance
+
+- Here, I show that our measure of balance is correlated with other reasonable measures
+- Balance indicator correlated with mean ideology score closer to 0
+- Balance indicator correlated with higher source ideology SD
+- Balance indicator correlated with lower normalized absolute difference between number of left and right sources
+
+### Histograms
+
+```{r, fig.width=12}
+ggarrange(plotlist = list(
+    ggplot(main, aes(x = cfscore, fill = balance)) +
+        geom_histogram() +
+        theme_min,
+    ggplot(main, aes(x = cfscore.sd, fill = balance)) +
+        geom_histogram() +
+        theme_min,
+    ggplot(main, aes(x = diff_normalized, fill = balance)) +
+        geom_histogram() +
+        theme_min
+), common.legend = T, legend = "bottom", nrow = 1)
+ggsave(here("paper/figures/balance-cf-hists.png"), width = 8, height = 4)
+```
+
+### Scatter 
+
+```{r}
+ggplot(main, aes(x = cfscore, y = cfscore.sd, color = balance)) +
+    geom_point(alpha = 0.3, stroke = NA) +
+    theme_min
+ggsave(here("paper/figures/balance-cfscoresd-scatter.png"), width = 6, height = 4)
+```
+
+### Regressions
+
+```{r}
+ms <- list(
+    feols(balance ~ cfscore, data = main),
+    feols(balance ~ cfscore | year + source, data = main),
+    feols(balance ~ cfscore.sd, data = main),
+    feols(balance ~ cfscore.sd | year + source, data = main),
+    feols(balance ~ diff_normalized, data = main),
+    feols(balance ~ diff_normalized | year + source, data = main)
+)
+etable2(ms, here("paper/tables/balance-cf-regressions.tex"))
+```
+
+## Balance trend over time
+
+- Balance generally declining over time
+- Particular drop in 2017-2020
+
+```{r}
+plots <- list(
+    main %>% group_by(year) %>% balance_rate() %>%
+        ggplot(aes(x = year, y = as.numeric(balance))) +
+        geom_line() +
+        theme_min +
+        scale_x_continuous(breaks = seq(2012, 2022, 2)) +
+        labs(y = "Balance", x = "Year"),
+    main %>% group_by(year) %>% summarize(cfscore.sd = mean(cfscore.sd, na.rm = T)) %>% ggplot(aes(x = year, y = cfscore.sd)) +
+        geom_line() +
+        theme_min +
+        scale_x_continuous(breaks = seq(2012, 2022, 2)) +
+        labs(y = "Cfscore SD", x = "Year")
+)
+ggarrange(plotlist = plots)
+ggsave(here("paper/figures/balance-overview-year.png"), width = 6, height = 4)
+```
+
+### Regression
+
+- 5.6% less balanced articles in Trump era
+
+```{r}
+ms <- list(
+    feols(balance ~ year, data=main),
+    feols(balance ~ admin, data=main),
+    feols(balance ~ year, data=main.i2),
+    feols(balance ~ admin, data=main.i2)
+)
+etable2(ms, here('paper/tables/balance-overview.tex'))
+```
+
+
+### Robust to imputation strategy
+
+- Our main specification uses matched DIME cfscore and includes imputed cfscores when data is missing.
+- Also, we count environmental_advocacy as left and fossil fuel categorization as right no matter what.
+- We can look at the balance over time varying this specification:
+    - Category only
+    - CFscore only
+    - No imputation
+    - All imputation
+- If anything the other specifications make the negative trend more pronounced
+
+```{r}
+specs <- list(
+    list("types" = c("org_category"), cfscore.options = list(), label = "Category only"),
+    list("types" = c("cfscore"), cfscore.options = list(), label = "Cfscore only"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(impute.off = T, nwd.sd.thres = 0.8), label = "Category + raw cfscore"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(nwd.sd.thresh = 0.8), label = "Category + imputed cfscore"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(impute.all = T, nwd.sd.thresh = 0.8), label = "Category + total imputation")
+)
+df <- lapply(specs, \(t) {
+    sources %>%
+        calculate_balance(
+            types = t$types,
+            cfscore.options = t$cfscore.options,
+        ) %>%
+        mutate(label = t$label)
+}) %>% bind_rows()
+df %>% ggplot(aes(x = date, y = as.numeric(balance), color = label)) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Specification")
+ggsave(here("paper/figures/balance-overview-robust-1.png"), width = 6, height = 4)
+df %>%
+    group_by(year, label) %>%
+    balance_rate() %>%
+    ggplot(aes(x = year, y = balance, color = label)) +
+    geom_line() +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Specification")
+```
+
+### Robustness to bad match threshold
+
+- When we match to DIME, we have to make a decision about what to do when there are multiple matches with a wide range of cfscores. 
+- Our default specification throws out matches with SD > 0.5 and uses the imputed score instead. 
+- We can vary the threshold used
+- The negative time trend is increasingly apparent the more strictly we reject bad matches.
+
+```{r}
+df <- lapply(seq(0.1, 1, 0.1), \(x) {
+    sources %>%
+        calculate_balance(
+            types = c("org_category", "cfscore"),
+            cfscore.options = list(nwd.sd.thresh = x),
+        ) %>%
+        mutate(label = x)
+}) %>% bind_rows()
+df %>% ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(label))) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Specification")
+ggsave(here("paper/figures/balance-overview-robust-2.png"), width = 6, height = 4)
+```
+
+### Robustness to varying left/right threshold
+
+- Our measure of balance depends on an arbitrary threshold 't'
+- Organizations with cfscore > t and cfscore < -t are classified as "right" and "left"
+- Our main specification uses t=0.3 
+- Vary `t` and observe similar time trends
+
+```{r}
+seq(0.1, 0.6, 0.1) %>%
+    lapply(\(t) {
+        sources %>%
+            group_by(textfile, date) %>%
+            calculate_balance(
+                types = c("org_category", "cfscore"),
+                cfscore.options = list(nwd.sd.thresh = 0.8),
+                thresh = t
+            ) %>%
+            mutate(thresh = t)
+    }) %>%
+    bind_rows() %>%
+    ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(thresh))) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Threshold")
+ggsave(here("paper/figures/balance-overview-robust-3.png"), width = 6, height = 4)
+```
+
+## Variation by Newspaper
+
+- How much do newspapers vary in their level of balance
+- WSJ is more balanced likely because it focuses on business audience
+- NYT does not drop balance as much as other sources
+- Overall, there is some outlet level variation. But also, lots of variation unexplained by outlet
+
+
+### Smoothed Trend
+
+```{r}
+ggarrange(plotlist = list(
+    main %>% ggplot(aes(x = date, y = as.numeric(balance), color = source)) +
+        geom_smooth(method = "loess", se = F) +
+        labs(y = "Balance", x = "Date", color = "Newspaper") +
+        theme_min,
+    main %>% ggplot(aes(x = date, y = as.numeric(cfscore.sd), color = source)) +
+        geom_smooth(method = "loess", se = F) +
+        labs(y = "Source SD", x = "Date", color = "Newspaper") +
+        theme_min
+), common.legend = T, legend = "bottom")
+```
+
+### Mean Balance By Year
+
+```{r}
+main %>%
+    group_by(year, source) %>%
+    summarize(balance = sum(balance, na.rm = T) / sum(!is.na(balance))) %>%
+    ggplot(aes(x = year, y = as.numeric(balance), color = source, lty = source, shape = source)) +
+    geom_line() +
+    geom_point() +
+    theme_min +
+    scale_x_continuous(breaks = seq(2012, 2022, 2)) +
+    labs(y = "Balance", x = "Date")
+ggsave(here("paper/figures/balance-overview-outlet.png"), width = 6, height = 4)
+```
+
+### Group by Newspaper Lean
+
+- WSJ is the only "right leaning newspaper"
+- NYT, LAT, WAPO "left"
+- USAToday, ChicagoT, "center"
+
+```{r}
+main$newspaper_lean <- replace_na(main$newspaper_lean, "CENTER")
+main %>%
+    group_by(year, newspaper_lean) %>%
+    summarize(balance = sum(balance, na.rm = T) / sum(!is.na(balance))) %>%
+    ggplot(aes(x = year, y = as.numeric(balance), color = newspaper_lean)) +
+    geom_line() +
+    geom_point() +
+    theme_min +
+    scale_x_continuous(breaks = seq(2012, 2022, 2)) +
+    scale_color_manual(values=c('CENTER' = 'grey40', 'LEFT'='dodgerblue', 'RIGHT'='coral')) + 
+    labs(y = "Balance", x = "Date")
+```
+
+### Regressions
+
+```{r}
+ms <- list(
+    feols(balance ~ source, data = main),
+    feols(balance ~ source * year, data = main),
+    feols(balance ~ source | year, data = main)
+)
+etable2(ms, here("paper/tables/source-balance.tex"))
+ms2 <- list(
+    feols(balance ~ (newspaper_lean == "RIGHT") * post2016, data = main),
+    feols(balance ~ (newspaper_lean == "RIGHT") * post2016 | year + source, data = main)
+)
+etable2(ms, here("paper/tables/source-lean-balance.tex"))
+```
+
+## Conclusions
+
+- We show balance in coverage as defined by types and ideology of cited organizations is lower during 2016-2020
+    - For some specifications, the overall trend is negative even into the Biden admin
+    - The outlet level analysis suggests that WSJ is somewhat different and continued to cite business sources, while left and center declined after 2016
+    - This doesn't survive the basic TWFE specification, although the estimate is the same magnitude
+- Lots of variation unexplained by outlet and year level factors. Is low R2 the best way to understand this?
+
+## Appendix / Supplementary
+
+
+### Mean Slant over Time
+```{r}
+main %>%
+    ggplot(aes(x = date, y = cfscore)) +
+    geom_smooth(method = "loess") +
+    labs(
+        y = "Mean Slant (cfscore)",
+        x = "Date"
+    ) +
+    theme_min
+ggsave(here("paper/figures/slant-overview.png"), width = 6, height = 4)
+```
+
+### Balance/Slant Scatter Plot
+```{r}
+main %>%
+    filter(!is.na(balance)) %>%
+    ggplot(aes(x = date, y = cfscore, color = balance, stroke = NA)) +
+    geom_hline(yintercept = 0, lty = 2) +
+    geom_point(alpha = 0.1, size = 3, position = position_jitter(height = 0.04)) +
+    geom_smooth(se = F) +
+    labs(y = "Slant (cfscore)", x = "Date", color = "Balance") +
+    theme_min
+ggsave(here("paper/figures/balance-slant-scatter.png"), width = 6, height = 4)
+```
+
+### Including politicians 
+
+```{r}
+df <- list(
+    c("org_category", "cfscore"),
+    c("org_category", "cfscore", "party")
+) %>%
+    lapply(\(t) {
+        sources %>%
+            calculate_balance(
+                types = t,
+            ) %>%
+            mutate(types = paste0(t, collapse = ","))
+    }) %>%
+    bind_rows()
+df %>%
+    ggplot(aes(x = date, y = as.numeric(balance), color = as.factor(types))) +
+    geom_smooth(se = F) +
+    theme_min +
+    labs(x = "Date", y = "Balance", color = "Threshold")
+```
+
+#### Politicians and SD
+
+Interesting pattern with SD. Parabolic shape...
+
+```{r}
+specs <- list(
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(nwd.sd.thresh = 0.8), label = "Default"),
+    list("types" = c("org_category", "cfscore"), cfscore.options = list(nwd.sd.thres = 0.8, pols = T), label = "Include Politician CFscore")
+)
+df <- specs %>%
+    lapply(\(t) {
+        sources %>%
+            calculate_balance(
+                types = t$types,
+                cfscore.options = t$cfscore.options,
+            ) %>%
+            mutate(label = t$label)
+    }) %>%
+    bind_rows()
+df %>% ggplot(aes(x = date, y = as.numeric(cfscore.sd), color = label)) +
+    geom_smooth(method = "loess") +
+    theme_min +
+    labs(x = "Date", y = "SD", color = "model")
+```
