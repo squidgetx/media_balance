@@ -29,7 +29,7 @@ articles.authors <- articles %>%
             year < 2016 ~ 'Obama',
             year < 2020 ~ 'Trump',
             TRUE ~ 'Biden'
-        )),
+        ),
         newspaper_lean = case_when(
             str_detect(source, "Wall St") ~ "RIGHT",
             str_detect(source, "New York") ~ "LEFT",
