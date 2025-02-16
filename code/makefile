@@ -1,6 +1,6 @@
-default: analysis
+default: analysis/_book/index.html
 
-analysis: ../data/masterdata/sources.tsv
+analysis/_book/index.html: ../data/masterdata/sources.tsv
 	make -C analysis
 
 ../data/masterdata/sources.tsv: sources/sources.tsv journalists/authors.clean.rds articles/articles.clean.tsv clean_all.R
